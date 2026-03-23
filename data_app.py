@@ -23,9 +23,17 @@ client = gspread.authorize(creds)
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
 
+# -------- DEFINE COLUMN ORDER (MASTER FIX) --------
+columns = [
+    "name","price","location","food","room",
+    "cleanliness","food_quality","rating",
+    "crowd","contact","notes","created_at"
+]
+
+
 # -------- LOAD DATA --------
 data = sheet.get_all_records()
-df = pd.DataFrame(data) if data else pd.DataFrame()
+df = pd.DataFrame(data) if data else pd.DataFrame(columns=columns)
 
 
 # -------- FORM --------
@@ -74,19 +82,12 @@ if not df.empty and "contact" in df.columns:
 
 # -------- PREVIEW --------
 if preview:
-
     st.subheader("🔍 Preview")
-
     st.write({
         "Name": name,
         "Location": location,
         "Price": price,
-        "Food": food,
-        "Room": room,
-        "Cleanliness": cleanliness,
-        "Food Quality": food_quality,
-        "⭐ Rating": rating,
-        "Crowd": crowd,
+        "Rating ⭐": rating,
         "Contact": contact,
         "Notes": clean_notes
     })
@@ -108,22 +109,25 @@ if submit:
 
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        row = [
-            name.strip().title(),
-            price,
-            location,
-            food,
-            room,
-            cleanliness,
-            food_quality,
-            rating,
-            crowd,
-            contact,
-            clean_notes,
-            created_at
-        ]
+        # ✅ DICT → PERFECT COLUMN MATCH
+        row_dict = {
+            "name": name.strip().title(),
+            "price": price,
+            "location": location,
+            "food": food,
+            "room": room,
+            "cleanliness": cleanliness,
+            "food_quality": food_quality,
+            "rating": rating,
+            "crowd": crowd,
+            "contact": contact,
+            "notes": clean_notes,
+            "created_at": created_at
+        }
 
-        # ✅ FAST + CLEAN SAVE
+        # ✅ ORDER FIX (NO MISMATCH EVER)
+        row = [row_dict[col] for col in columns]
+
         sheet.append_row(row, value_input_option="USER_ENTERED")
 
         st.success("✅ Saved Successfully!")
@@ -139,6 +143,7 @@ data = sheet.get_all_records()
 
 if data:
     df = pd.DataFrame(data)
+    df = df.reindex(columns=columns)  # ✅ FORCE ORDER
     st.dataframe(df, use_container_width=True)
 else:
     st.info("No data yet")
