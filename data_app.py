@@ -111,7 +111,6 @@ if save_btn:
         st.success("✅ Saved!")
 
         del st.session_state.preview
-
         st.rerun()
 
 
@@ -121,7 +120,7 @@ st.subheader("📊 PG Database")
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
 
-# ✅ VERY IMPORTANT FIX (NO KEYERROR EVER)
+# ✅ FIX COLUMN ISSUES
 df.columns = df.columns.str.strip().str.lower()
 
 
@@ -172,21 +171,24 @@ if not df.empty:
     if st.button("💾 Update"):
 
         updated_row = [
-            new_name,
-            safe_get(row_data, "price"),
-            safe_get(row_data, "location"),
-            safe_get(row_data, "food"),
-            safe_get(row_data, "room"),
-            safe_get(row_data, "cleanliness"),
-            safe_get(row_data, "food_quality"),
-            safe_get(row_data, "rating"),
-            safe_get(row_data, "crowd"),
-            safe_get(row_data, "contact"),
-            safe_get(row_data, "notes"),
-            safe_get(row_data, "created_at")
+            str(new_name),
+            str(safe_get(row_data, "price")),
+            str(safe_get(row_data, "location")),
+            str(safe_get(row_data, "food")),
+            str(safe_get(row_data, "room")),
+            str(safe_get(row_data, "cleanliness")),
+            str(safe_get(row_data, "food_quality")),
+            str(safe_get(row_data, "rating")),
+            str(safe_get(row_data, "crowd")),
+            str(safe_get(row_data, "contact")),
+            str(safe_get(row_data, "notes")),
+            str(safe_get(row_data, "created_at"))
         ]
 
-        sheet.update(f"A{index+2}:L{index+2}", [updated_row])
+        sheet.update(
+            f"A{index+2}:L{index+2}",
+            [updated_row]
+        )
 
         st.success("Updated!")
         st.rerun()
