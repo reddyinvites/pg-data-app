@@ -6,6 +6,40 @@ from datetime import datetime
 
 st.set_page_config(page_title="PG Data Collector", layout="wide")
 
+# -------- LOGIN SYSTEM --------
+if "logged_in" not in st.session_state:
+    st.session_state.logged_in = False
+
+def login():
+    st.title("🔐 Admin Login")
+
+    username = st.text_input("Username")
+    password = st.text_input("Password", type="password")
+
+    if st.button("Login"):
+        if (
+            username == st.secrets["auth"]["username"]
+            and password == st.secrets["auth"]["password"]
+        ):
+            st.session_state.logged_in = True
+            st.success("Login successful!")
+            st.rerun()
+        else:
+            st.error("Invalid credentials")
+
+def logout():
+    st.session_state.logged_in = False
+    st.rerun()
+
+# -------- AUTH CHECK --------
+if not st.session_state.logged_in:
+    login()
+    st.stop()
+
+# -------- SIDEBAR --------
+st.sidebar.success("Logged in as Admin")
+st.sidebar.button("🚪 Logout", on_click=logout)
+
 st.title("📝 PG Data Collection")
 
 # -------- GOOGLE SHEETS CONNECT --------
@@ -120,7 +154,7 @@ st.subheader("📊 PG Database")
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
 
-# ✅ FIX COLUMN ISSUES
+# FIX COLUMN ISSUES
 df.columns = df.columns.str.strip().str.lower()
 
 
@@ -159,13 +193,13 @@ if not df.empty:
 
     st.write("Selected:", safe_get(row_data, "name"))
 
-    # -------- DELETE --------
+    # DELETE
     if st.button("🗑 Delete"):
         sheet.delete_rows(index + 2)
         st.success("Deleted!")
         st.rerun()
 
-    # -------- EDIT --------
+    # EDIT
     new_name = st.text_input("Edit Name", safe_get(row_data, "name"))
 
     if st.button("💾 Update"):
@@ -185,10 +219,7 @@ if not df.empty:
             str(safe_get(row_data, "created_at"))
         ]
 
-        sheet.update(
-            f"A{index+2}:L{index+2}",
-            [updated_row]
-        )
+        sheet.update(f"A{index+2}:L{index+2}", [updated_row])
 
         st.success("Updated!")
         st.rerun()
