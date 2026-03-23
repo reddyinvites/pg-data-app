@@ -1,35 +1,41 @@
 import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
+from datetime import datetime
+import pandas as pd
 
-st.set_page_config(page_title="PG Data Collector")
+st.set_page_config(page_title="PG Admin Panel")
 
-st.title("📝 PG Data Collection")
+st.title("📝 PG Data Admin Panel")
 
-# -------- CONNECT GOOGLE SHEETS --------
+# -------- GOOGLE SHEETS CONNECT --------
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds_dict = st.secrets["gcp"]
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["gcp"], scope
+)
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
+
+
+# -------- LOAD EXISTING DATA --------
+data = sheet.get_all_records()
+df = pd.DataFrame(data) if data else pd.DataFrame()
 
 
 # ---------------- FORM ----------------
 with st.form("pg_form"):
 
     name = st.text_input("PG Name")
-
     location = st.selectbox(
         "Location",
         ["ameerpet", "madhapur", "hitech city", "sr nagar"]
     )
-
     price = st.number_input("Price (₹)", 3000, 15000, step=500)
 
     food = st.selectbox("Food Available", ["Yes", "No"])
@@ -49,30 +55,73 @@ with st.form("pg_form"):
 # ---------------- SAVE ----------------
 if submit:
 
-    if name.strip() == "":
-        st.error("⚠️ Please enter PG name")
+    # 🔴 VALIDATION
+    if not name or not contact:
+        st.error("⚠️ Name & Contact required!")
+    elif len(contact) != 10 or not contact.isdigit():
+        st.error("⚠️ Enter valid 10-digit phone number")
     else:
 
-        clean_notes = " | ".join(
-            [n.strip() for n in notes.split("\n") if n.strip()]
-        )
+        name = name.title()
+        location = location.title()
 
-        row = [
-            name.strip(), price, location, food, room,
-            cleanliness, food_quality, crowd, contact.strip(), clean_notes
-        ]
+        # 🔥 DUPLICATE CHECK
+        existing_names = df["name"].str.lower().tolist() if not df.empty else []
+        if name.lower() in existing_names:
+            st.error("⚠️ PG already exists!")
+        else:
 
-        sheet.append_row(row)
+            # ⭐ AUTO RATING
+            rating = round((cleanliness + food_quality) / 2, 1)
 
-        st.success("✅ PG Saved Successfully!")
+            # 🧹 CLEAN NOTES
+            clean_notes = " | ".join(
+                [n.strip() for n in notes.split("\n") if n.strip()]
+            )
+
+            # 🕒 TIMESTAMP
+            created_at = datetime.now().strftime("%Y-%m-%d %H:%M")
+
+            # 📦 FINAL ROW (ORDER IMPORTANT)
+            row = [
+                name,
+                price,
+                location,
+                food,
+                room,
+                cleanliness,
+                food_quality,
+                rating,
+                crowd,
+                contact,
+                clean_notes,
+                created_at
+            ]
+
+            # 👀 PREVIEW
+            st.write("Preview:", row)
+
+            # 💾 SAVE
+            sheet.append_row(row)
+
+            st.success("✅ PG Saved Successfully!")
+            st.experimental_rerun()
 
 
 # ---------------- SHOW DATA ----------------
-st.subheader("📊 Saved PG Data")
+st.subheader("📊 PG Database")
 
-data = sheet.get_all_records()
+if not df.empty:
 
-if data:
-    st.dataframe(data)
+    expected_cols = [
+        "name","price","location","food","room",
+        "cleanliness","food_quality","rating",
+        "crowd","contact","notes","created_at"
+    ]
+
+    df = df[expected_cols]
+
+    st.dataframe(df)
+
 else:
-    st.info("No data available yet")
+    st.info("No data yet")
