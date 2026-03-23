@@ -1,20 +1,24 @@
 import streamlit as st
-import pandas as pd
-import os
+import gspread
+from oauth2client.service_account import ServiceAccountCredentials
 
 st.set_page_config(page_title="PG Data Collector")
 
 st.title("📝 PG Data Collection")
 
-file_name = "pg_data.csv"
+# -------- CONNECT GOOGLE SHEETS --------
+scope = [
+    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/drive"
+]
 
-# ---------------- CREATE FILE ----------------
-if not os.path.exists(file_name):
-    df = pd.DataFrame(columns=[
-        "name","price","location","food","room",
-        "cleanliness","food_quality","crowd","contact","notes"
-    ])
-    df.to_csv(file_name, index=False)
+creds_dict = st.secrets["gcp"]
+
+creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+client = gspread.authorize(creds)
+
+sheet = client.open("pg_data").sheet1
+
 
 # ---------------- FORM ----------------
 with st.form("pg_form"):
@@ -41,6 +45,7 @@ with st.form("pg_form"):
 
     submit = st.form_submit_button("💾 Save PG")
 
+
 # ---------------- SAVE ----------------
 if submit:
 
@@ -48,42 +53,26 @@ if submit:
         st.error("⚠️ Please enter PG name")
     else:
 
-        # ✅ CLEAN NOTES (NO BREAK, NO ERROR)
         clean_notes = " | ".join(
             [n.strip() for n in notes.split("\n") if n.strip()]
         )
 
-        new_data = {
-            "name": name.strip(),
-            "price": price,
-            "location": location,
-            "food": food,
-            "room": room,
-            "cleanliness": cleanliness,
-            "food_quality": food_quality,
-            "crowd": crowd,
-            "contact": contact.strip(),
-            "notes": clean_notes
-        }
+        row = [
+            name.strip(), price, location, food, room,
+            cleanliness, food_quality, crowd, contact.strip(), clean_notes
+        ]
 
-        df = pd.read_csv(file_name)
-        df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
-
-        # ✅ NO INDEX ISSUE
-        df.to_csv(file_name, index=False)
+        sheet.append_row(row)
 
         st.success("✅ PG Saved Successfully!")
+
 
 # ---------------- SHOW DATA ----------------
 st.subheader("📊 Saved PG Data")
 
-df = pd.read_csv(file_name)
-st.dataframe(df)
+data = sheet.get_all_records()
 
-# ---------------- DOWNLOAD ----------------
-st.download_button(
-    "📥 Download CSV",
-    data=df.to_csv(index=False),
-    file_name="pg_data.csv",
-    mime="text/csv"
-        )
+if data:
+    st.dataframe(data)
+else:
+    st.info("No data available yet")
