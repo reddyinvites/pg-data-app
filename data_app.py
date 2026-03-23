@@ -2,6 +2,8 @@ import streamlit as st
 import pandas as pd
 import os
 
+st.set_page_config(page_title="PG Data Collector")
+
 st.title("📝 PG Data Collection")
 
 file_name = "pg_data.csv"
@@ -42,15 +44,17 @@ with st.form("pg_form"):
 # ---------------- SAVE ----------------
 if submit:
 
-    if name == "":
+    if name.strip() == "":
         st.error("⚠️ Please enter PG name")
     else:
 
-        # ✅ FIX NOTES (remove newline + comma)
-        clean_notes = notes.replace("\n", " | ").replace(",", " ")
+        # ✅ CLEAN NOTES (NO BREAK, NO ERROR)
+        clean_notes = " | ".join(
+            [n.strip() for n in notes.split("\n") if n.strip()]
+        )
 
         new_data = {
-            "name": name,
+            "name": name.strip(),
             "price": price,
             "location": location,
             "food": food,
@@ -58,14 +62,14 @@ if submit:
             "cleanliness": cleanliness,
             "food_quality": food_quality,
             "crowd": crowd,
-            "contact": contact,
+            "contact": contact.strip(),
             "notes": clean_notes
         }
 
         df = pd.read_csv(file_name)
         df = pd.concat([df, pd.DataFrame([new_data])], ignore_index=True)
 
-        # ✅ FIX INDEX ISSUE
+        # ✅ NO INDEX ISSUE
         df.to_csv(file_name, index=False)
 
         st.success("✅ PG Saved Successfully!")
@@ -76,10 +80,10 @@ st.subheader("📊 Saved PG Data")
 df = pd.read_csv(file_name)
 st.dataframe(df)
 
-# ---------------- DOWNLOAD BUTTON ----------------
+# ---------------- DOWNLOAD ----------------
 st.download_button(
-    label="📥 Download CSV",
+    "📥 Download CSV",
     data=df.to_csv(index=False),
     file_name="pg_data.csv",
     mime="text/csv"
-)
+        )
