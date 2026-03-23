@@ -3,24 +3,28 @@ import gspread
 import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import re
 
-st.set_page_config(page_title="PG Data Collector")
+st.set_page_config(page_title="PG Data Collector", layout="centered")
 
-st.title("📝 PG Data Collection")
+st.title("🏠 PG Data Collector (PRO)")
 
-# -------- GOOGLE SHEETS CONNECT --------
+# -------- GOOGLE SHEETS --------
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds_dict = st.secrets["gcp"]
-
-creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["gcp"], scope
+)
 client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
+# -------- LOAD EXISTING DATA --------
+data = sheet.get_all_records()
+df = pd.DataFrame(data) if data else pd.DataFrame()
 
 # -------- FORM --------
 with st.form("pg_form"):
@@ -37,50 +41,88 @@ with st.form("pg_form"):
     food = st.selectbox("Food Available", ["Yes", "No"])
     room = st.selectbox("Room Type", ["AC", "Non-AC"])
 
-    cleanliness = st.slider("Cleanliness (1-10)", 1, 10)
-    food_quality = st.slider("Food Quality (1-10)", 1, 10)
+    cleanliness = st.slider("Cleanliness", 1, 10)
+    food_quality = st.slider("Food Quality", 1, 10)
 
-    crowd = st.selectbox("Crowd Type", ["Employees", "Students", "Mixed"])
+    crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
 
     contact = st.text_input("Contact Number")
     notes = st.text_area("Extra Notes")
 
-    submit = st.form_submit_button("💾 Save PG")
+    preview = st.form_submit_button("👁 Preview")
+    submit = st.form_submit_button("💾 Save")
 
+# -------- CLEAN NOTES --------
+clean_notes = " | ".join(
+    [n.strip() for n in notes.split("\n") if n.strip()]
+)
 
-# -------- SAVE DATA --------
+# -------- AUTO RATING --------
+rating = round((cleanliness + food_quality) / 2, 1)
+
+# -------- PHONE VALIDATION --------
+phone_valid = re.fullmatch(r"\d{10}", contact)
+
+# -------- DUPLICATE CHECK --------
+duplicate = False
+if not df.empty and "contact" in df.columns:
+    duplicate = contact in df["contact"].astype(str).values
+
+# -------- PREVIEW --------
+if preview:
+
+    st.subheader("🔍 Preview")
+
+    st.write({
+        "Name": name,
+        "Location": location,
+        "Price": price,
+        "Food": food,
+        "Room": room,
+        "Cleanliness": cleanliness,
+        "Food Quality": food_quality,
+        "⭐ Rating": rating,
+        "Crowd": crowd,
+        "Contact": contact,
+        "Notes": clean_notes
+    })
+
+# -------- SAVE --------
 if submit:
 
     if name.strip() == "":
-        st.error("⚠️ Please enter PG name")
+        st.error("❌ Enter PG Name")
+
+    elif not phone_valid:
+        st.error("❌ Enter valid 10-digit phone number")
+
+    elif duplicate:
+        st.warning("⚠️ This contact already exists")
 
     else:
-        clean_notes = " | ".join(
-            [n.strip() for n in notes.split("\n") if n.strip()]
-        )
 
         created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
         row = [
-            name.strip(),
+            name.strip().title(),
             price,
             location,
             food,
             room,
             cleanliness,
             food_quality,
+            rating,
             crowd,
-            contact.strip(),
+            contact,
             clean_notes,
             created_at
         ]
 
         sheet.append_row(row)
 
-        st.success("✅ PG Saved to Google Sheets!")
+        st.success("✅ Saved Successfully!")
 
-
-# -------- DISPLAY DATA --------
+# -------- DISPLAY --------
 st.subheader("📊 PG Database")
 
 data = sheet.get_all_records()
@@ -89,4 +131,4 @@ if data:
     df = pd.DataFrame(data)
     st.dataframe(df, use_container_width=True)
 else:
-    st.info("No data available yet")
+    st.info("No data yet")
