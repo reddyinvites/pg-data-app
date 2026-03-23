@@ -75,6 +75,7 @@ if preview_btn:
         "notes": clean_notes
     }
 
+
 # -------- SHOW PREVIEW --------
 if "preview" in st.session_state:
     st.subheader("🔍 Preview")
@@ -111,7 +112,6 @@ if save_btn:
 
         del st.session_state.preview
 
-        st.cache_data.clear()
         st.rerun()
 
 
@@ -120,6 +120,10 @@ st.subheader("📊 PG Database")
 
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
+
+# ✅ VERY IMPORTANT FIX (NO KEYERROR EVER)
+df.columns = df.columns.str.strip().str.lower()
+
 
 # -------- SEARCH + FILTER --------
 st.subheader("🔍 Search & Filter")
@@ -145,13 +149,16 @@ if not df.empty:
 # -------- EDIT / DELETE --------
 st.subheader("✏️ Edit / Delete")
 
+def safe_get(row, key):
+    return row[key] if key in row else ""
+
 if not df.empty:
 
     index = st.selectbox("Select Row", df.index)
 
     row_data = df.loc[index]
 
-    st.write("Selected:", row_data["name"])
+    st.write("Selected:", safe_get(row_data, "name"))
 
     # -------- DELETE --------
     if st.button("🗑 Delete"):
@@ -160,23 +167,23 @@ if not df.empty:
         st.rerun()
 
     # -------- EDIT --------
-    new_name = st.text_input("Edit Name", row_data["name"])
+    new_name = st.text_input("Edit Name", safe_get(row_data, "name"))
 
     if st.button("💾 Update"):
 
         updated_row = [
             new_name,
-            row_data["price"],
-            row_data["location"],
-            row_data["food"],
-            row_data["room"],
-            row_data["cleanliness"],
-            row_data["food_quality"],
-            row_data["rating"],
-            row_data["crowd"],
-            row_data["contact"],
-            row_data["notes"],
-            row_data["created_at"]
+            safe_get(row_data, "price"),
+            safe_get(row_data, "location"),
+            safe_get(row_data, "food"),
+            safe_get(row_data, "room"),
+            safe_get(row_data, "cleanliness"),
+            safe_get(row_data, "food_quality"),
+            safe_get(row_data, "rating"),
+            safe_get(row_data, "crowd"),
+            safe_get(row_data, "contact"),
+            safe_get(row_data, "notes"),
+            safe_get(row_data, "created_at")
         ]
 
         sheet.update(f"A{index+2}:L{index+2}", [updated_row])
