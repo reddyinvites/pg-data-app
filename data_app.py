@@ -1,13 +1,11 @@
 import streamlit as st
 import gspread
-import pandas as pd
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import re
 
-st.set_page_config(page_title="PG Data Collector", layout="centered")
+st.set_page_config(page_title="PG Data Collector")
 
-st.title("🏠 PG Data Collector (PRO)")
+st.title("📝 PG Data Collection")
 
 # -------- GOOGLE SHEETS CONNECT --------
 scope = [
@@ -18,22 +16,12 @@ scope = [
 creds = ServiceAccountCredentials.from_json_keyfile_dict(
     st.secrets["gcp"], scope
 )
+
 client = gspread.authorize(creds)
 
-sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
-
-
-# -------- DEFINE COLUMN ORDER (MASTER FIX) --------
-columns = [
-    "name","price","location","food","room",
-    "cleanliness","food_quality","rating",
-    "crowd","contact","notes","created_at"
-]
-
-
-# -------- LOAD DATA --------
-data = sheet.get_all_records()
-df = pd.DataFrame(data) if data else pd.DataFrame(columns=columns)
+sheet = client.open_by_key(
+    "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
+).sheet1
 
 
 # -------- FORM --------
@@ -46,72 +34,38 @@ with st.form("pg_form"):
         ["ameerpet", "madhapur", "hitech city", "sr nagar"]
     )
 
-    price = st.number_input("Price (₹)", 3000, 15000, step=500)
+    price = st.number_input("Price (₹)", 3000, 20000, step=500)
 
     food = st.selectbox("Food Available", ["Yes", "No"])
     room = st.selectbox("Room Type", ["AC", "Non-AC"])
 
-    cleanliness = st.slider("Cleanliness", 1, 10)
-    food_quality = st.slider("Food Quality", 1, 10)
+    cleanliness = st.slider("Cleanliness (1-10)", 1, 10)
+    food_quality = st.slider("Food Quality (1-10)", 1, 10)
 
-    crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
+    crowd = st.selectbox("Crowd Type", ["Employees", "Students", "Mixed"])
 
     contact = st.text_input("Contact Number")
     notes = st.text_area("Extra Notes")
 
-    preview = st.form_submit_button("👁 Preview")
-    submit = st.form_submit_button("💾 Save")
-
-
-# -------- CLEAN NOTES --------
-clean_notes = " | ".join(
-    [n.strip() for n in notes.split("\n") if n.strip()]
-)
-
-# -------- AUTO RATING --------
-rating = round((cleanliness + food_quality) / 2, 1)
-
-# -------- PHONE VALIDATION --------
-phone_valid = re.fullmatch(r"\d{10}", contact)
-
-# -------- DUPLICATE CHECK --------
-duplicate = False
-if not df.empty and "contact" in df.columns:
-    duplicate = contact in df["contact"].astype(str).values
+    preview_btn = st.form_submit_button("👁 Preview")
+    save_btn = st.form_submit_button("💾 Save")
 
 
 # -------- PREVIEW --------
-if preview:
-    st.subheader("🔍 Preview")
-    st.write({
-        "Name": name,
-        "Location": location,
-        "Price": price,
-        "Rating ⭐": rating,
-        "Contact": contact,
-        "Notes": clean_notes
-    })
-
-
-# -------- SAVE --------
-if submit:
+if preview_btn:
 
     if name.strip() == "":
-        st.error("❌ Enter PG Name")
-
-    elif not phone_valid:
-        st.error("❌ Enter valid 10-digit phone number")
-
-    elif duplicate:
-        st.warning("⚠️ This contact already exists")
-
+        st.error("⚠️ Enter PG name")
     else:
 
-        created_at = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        clean_notes = " | ".join(
+            [n.strip() for n in notes.split("\n") if n.strip()]
+        )
 
-        # ✅ DICT → PERFECT COLUMN MATCH
-        row_dict = {
-            "name": name.strip().title(),
+        rating = round((cleanliness + food_quality) / 2, 1)
+
+        st.session_state.preview_data = {
+            "name": name.strip(),
             "price": price,
             "location": location,
             "food": food,
@@ -120,30 +74,54 @@ if submit:
             "food_quality": food_quality,
             "rating": rating,
             "crowd": crowd,
-            "contact": contact,
-            "notes": clean_notes,
-            "created_at": created_at
+            "contact": contact.strip(),
+            "notes": clean_notes
         }
 
-        # ✅ ORDER FIX (NO MISMATCH EVER)
-        row = [row_dict[col] for col in columns]
-
-        sheet.append_row(row, value_input_option="USER_ENTERED")
-
-        st.success("✅ Saved Successfully!")
-
-        # 🔥 INSTANT REFRESH
-        st.rerun()
+# -------- SHOW PREVIEW --------
+if "preview_data" in st.session_state:
+    st.subheader("🔍 Preview")
+    st.json(st.session_state.preview_data)
 
 
-# -------- DISPLAY --------
+# -------- SAVE --------
+if save_btn:
+
+    if "preview_data" not in st.session_state:
+        st.error("⚠️ Click Preview first")
+    else:
+
+        data = st.session_state.preview_data
+
+        # ✅ EXACT ORDER MATCH WITH SHEET
+        row = [
+            data["name"],
+            data["price"],
+            data["location"],
+            data["food"],
+            data["room"],
+            data["cleanliness"],
+            data["food_quality"],
+            data["rating"],
+            data["crowd"],
+            data["contact"],
+            data["notes"],
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
+
+        sheet.append_row(row)
+
+        st.success("✅ Saved to Google Sheets!")
+
+        del st.session_state.preview_data
+
+
+# -------- DISPLAY DATA --------
 st.subheader("📊 PG Database")
 
 data = sheet.get_all_records()
 
 if data:
-    df = pd.DataFrame(data)
-    df = df.reindex(columns=columns)  # ✅ FORCE ORDER
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(data)
 else:
     st.info("No data yet")
