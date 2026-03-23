@@ -9,7 +9,7 @@ st.set_page_config(page_title="PG Data Collector", layout="centered")
 
 st.title("🏠 PG Data Collector (PRO)")
 
-# -------- GOOGLE SHEETS --------
+# -------- GOOGLE SHEETS CONNECT --------
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
@@ -22,9 +22,11 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
-# -------- LOAD EXISTING DATA --------
+
+# -------- LOAD DATA --------
 data = sheet.get_all_records()
 df = pd.DataFrame(data) if data else pd.DataFrame()
+
 
 # -------- FORM --------
 with st.form("pg_form"):
@@ -52,6 +54,7 @@ with st.form("pg_form"):
     preview = st.form_submit_button("👁 Preview")
     submit = st.form_submit_button("💾 Save")
 
+
 # -------- CLEAN NOTES --------
 clean_notes = " | ".join(
     [n.strip() for n in notes.split("\n") if n.strip()]
@@ -67,6 +70,7 @@ phone_valid = re.fullmatch(r"\d{10}", contact)
 duplicate = False
 if not df.empty and "contact" in df.columns:
     duplicate = contact in df["contact"].astype(str).values
+
 
 # -------- PREVIEW --------
 if preview:
@@ -86,6 +90,7 @@ if preview:
         "Contact": contact,
         "Notes": clean_notes
     })
+
 
 # -------- SAVE --------
 if submit:
@@ -118,9 +123,14 @@ if submit:
             created_at
         ]
 
-        sheet.append_row(row)
+        # ✅ FAST + CLEAN SAVE
+        sheet.append_row(row, value_input_option="USER_ENTERED")
 
         st.success("✅ Saved Successfully!")
+
+        # 🔥 INSTANT REFRESH
+        st.rerun()
+
 
 # -------- DISPLAY --------
 st.subheader("📊 PG Database")
