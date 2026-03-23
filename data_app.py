@@ -17,7 +17,7 @@ creds_dict = st.secrets["gcp"]
 creds = ServiceAccountCredentials.from_json_keyfile_dict(creds_dict, scope)
 client = gspread.authorize(creds)
 
-sheet = client.open("pg_data").sheet1
+sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
 
 # ---------------- FORM ----------------
