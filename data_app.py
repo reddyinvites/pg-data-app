@@ -1,9 +1,10 @@
 import streamlit as st
+import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 
-st.set_page_config(page_title="PG Data Collector")
+st.set_page_config(page_title="PG Data Collector", layout="wide")
 
 st.title("📝 PG Data Collection")
 
@@ -39,10 +40,10 @@ with st.form("pg_form"):
     food = st.selectbox("Food Available", ["Yes", "No"])
     room = st.selectbox("Room Type", ["AC", "Non-AC"])
 
-    cleanliness = st.slider("Cleanliness (1-10)", 1, 10)
-    food_quality = st.slider("Food Quality (1-10)", 1, 10)
+    cleanliness = st.slider("Cleanliness", 1, 10)
+    food_quality = st.slider("Food Quality", 1, 10)
 
-    crowd = st.selectbox("Crowd Type", ["Employees", "Students", "Mixed"])
+    crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
 
     contact = st.text_input("Contact Number")
     notes = st.text_area("Extra Notes")
@@ -54,74 +55,131 @@ with st.form("pg_form"):
 # -------- PREVIEW --------
 if preview_btn:
 
-    if name.strip() == "":
-        st.error("⚠️ Enter PG name")
-    else:
+    clean_notes = " | ".join(
+        [n.strip() for n in notes.split("\n") if n.strip()]
+    )
 
-        clean_notes = " | ".join(
-            [n.strip() for n in notes.split("\n") if n.strip()]
-        )
+    rating = round((cleanliness + food_quality) / 2, 1)
 
-        rating = round((cleanliness + food_quality) / 2, 1)
-
-        st.session_state.preview_data = {
-            "name": name.strip(),
-            "price": price,
-            "location": location,
-            "food": food,
-            "room": room,
-            "cleanliness": cleanliness,
-            "food_quality": food_quality,
-            "rating": rating,
-            "crowd": crowd,
-            "contact": contact.strip(),
-            "notes": clean_notes
-        }
+    st.session_state.preview = {
+        "name": name.strip(),
+        "price": price,
+        "location": location,
+        "food": food,
+        "room": room,
+        "cleanliness": cleanliness,
+        "food_quality": food_quality,
+        "rating": rating,
+        "crowd": crowd,
+        "contact": contact.strip(),
+        "notes": clean_notes
+    }
 
 # -------- SHOW PREVIEW --------
-if "preview_data" in st.session_state:
+if "preview" in st.session_state:
     st.subheader("🔍 Preview")
-    st.json(st.session_state.preview_data)
+    st.json(st.session_state.preview)
 
 
 # -------- SAVE --------
 if save_btn:
 
-    if "preview_data" not in st.session_state:
+    if "preview" not in st.session_state:
         st.error("⚠️ Click Preview first")
     else:
 
-        data = st.session_state.preview_data
+        d = st.session_state.preview
 
-        # ✅ EXACT ORDER MATCH WITH SHEET
         row = [
-            data["name"],
-            data["price"],
-            data["location"],
-            data["food"],
-            data["room"],
-            data["cleanliness"],
-            data["food_quality"],
-            data["rating"],
-            data["crowd"],
-            data["contact"],
-            data["notes"],
+            d["name"],
+            d["price"],
+            d["location"],
+            d["food"],
+            d["room"],
+            d["cleanliness"],
+            d["food_quality"],
+            d["rating"],
+            d["crowd"],
+            d["contact"],
+            d["notes"],
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ]
 
-        sheet.append_row(row)
+        sheet.append_row(row, value_input_option="USER_ENTERED")
 
-        st.success("✅ Saved to Google Sheets!")
+        st.success("✅ Saved!")
 
-        del st.session_state.preview_data
+        del st.session_state.preview
+
+        st.cache_data.clear()
+        st.rerun()
 
 
-# -------- DISPLAY DATA --------
+# -------- LOAD DATA --------
 st.subheader("📊 PG Database")
 
 data = sheet.get_all_records()
+df = pd.DataFrame(data)
 
-if data:
-    st.dataframe(data)
-else:
-    st.info("No data yet")
+# -------- SEARCH + FILTER --------
+st.subheader("🔍 Search & Filter")
+
+search = st.text_input("Search PG")
+
+location_filter = st.selectbox(
+    "Filter Location",
+    ["All", "ameerpet", "madhapur", "hitech city", "sr nagar"]
+)
+
+if not df.empty:
+
+    if search:
+        df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)]
+
+    if location_filter != "All":
+        df = df[df["location"] == location_filter]
+
+    st.dataframe(df, use_container_width=True)
+
+
+# -------- EDIT / DELETE --------
+st.subheader("✏️ Edit / Delete")
+
+if not df.empty:
+
+    index = st.selectbox("Select Row", df.index)
+
+    row_data = df.loc[index]
+
+    st.write("Selected:", row_data["name"])
+
+    # -------- DELETE --------
+    if st.button("🗑 Delete"):
+        sheet.delete_rows(index + 2)
+        st.success("Deleted!")
+        st.rerun()
+
+    # -------- EDIT --------
+    new_name = st.text_input("Edit Name", row_data["name"])
+
+    if st.button("💾 Update"):
+
+        updated_row = [
+            new_name,
+            row_data["price"],
+            row_data["location"],
+            row_data["food"],
+            row_data["room"],
+            row_data["cleanliness"],
+            row_data["food_quality"],
+            row_data["rating"],
+            row_data["crowd"],
+            row_data["contact"],
+            row_data["notes"],
+            row_data["created_at"]
+        ]
+
+        sheet.update(f"A{index+2}:L{index+2}", [updated_row])
+
+        st.success("Updated!")
+        st.rerun()
