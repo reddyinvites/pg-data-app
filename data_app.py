@@ -82,7 +82,8 @@ with st.form("pg_form"):
         col1, col2, col3 = st.columns(3)
 
         with col1:
-            share_type = st.selectbox("Type",
+            share_type = st.selectbox(
+                "Type",
                 ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
                 index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(s["type"]),
                 key=f"type_{i}"
@@ -103,7 +104,7 @@ with st.form("pg_form"):
             available_beds = st.number_input("Available Beds", value=s["available_beds"], key=f"ab_{i}")
 
         with col6:
-            if st.form_submit_button("❌ Remove", key=f"del_{i}"):
+            if st.form_submit_button("❌ Remove", key=f"remove_{i}"):
                 st.session_state.sharing_data.pop(i)
                 st.rerun()
 
@@ -123,9 +124,16 @@ with st.form("pg_form"):
     food_type = st.selectbox("Food Type", ["Veg", "Non-Veg", "Mixed"])
     laundry = st.selectbox("Laundry", ["Yes", "No"])
 
-    near_metro = st.checkbox("Near Metro")
-    near_bus = st.checkbox("Near Bus Stop")
-    near_rail = st.checkbox("Near Railway Station")
+    st.subheader("📏 Distance")
+
+    metro_dist = st.number_input("Metro Distance (meters)", 0, 10000)
+    st.caption(f"≈ {metro_dist/1000:.2f} km")
+
+    bus_dist = st.number_input("Bus Stop Distance (meters)", 0, 10000)
+    st.caption(f"≈ {bus_dist/1000:.2f} km")
+
+    rail_dist = st.number_input("Railway Station Distance (meters)", 0, 20000)
+    st.caption(f"≈ {rail_dist/1000:.2f} km")
 
     nearby_places = st.text_input("Nearby Places")
 
@@ -147,11 +155,10 @@ if preview:
     st.json({
         "name": name,
         "sharing": st.session_state.sharing_data,
-        "food": food_type,
-        "location_tags": {
-            "metro": near_metro,
-            "bus": near_bus,
-            "rail": near_rail
+        "distances": {
+            "metro": metro_dist,
+            "bus": bus_dist,
+            "rail": rail_dist
         }
     })
 
@@ -167,9 +174,9 @@ if save:
         json.dumps(st.session_state.sharing_data),
         food_type,
         laundry,
-        near_metro,
-        near_bus,
-        near_rail,
+        metro_dist,
+        bus_dist,
+        rail_dist,
         nearby_places,
         rating,
         notes,
@@ -202,12 +209,12 @@ if not df.empty:
             col1, col2 = st.columns(2)
 
             with col1:
-                if st.button("🗑 Delete", key=f"del_{i}"):
+                if st.button("🗑 Delete", key=f"delete_{i}_{df.loc[i,'name']}"):
                     sheet.delete_rows(i+2)
                     st.rerun()
 
             with col2:
-                if st.button("✏️ Edit", key=f"edit_{i}"):
+                if st.button("✏️ Edit", key=f"edit_{i}_{df.loc[i,'name']}"):
                     st.session_state.edit_index = i
 
 # -------- EDIT --------
@@ -223,6 +230,10 @@ if "edit_index" in st.session_state:
     new_food = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     new_laundry = st.selectbox("Laundry", ["Yes","No"])
 
+    new_metro = st.number_input("Metro Distance", value=int(row.get("metro_dist",0)))
+    new_bus = st.number_input("Bus Distance", value=int(row.get("bus_dist",0)))
+    new_rail = st.number_input("Rail Distance", value=int(row.get("rail_dist",0)))
+
     if st.button("💾 Update"):
 
         updated_row = [
@@ -233,9 +244,9 @@ if "edit_index" in st.session_state:
             row.get("sharing_json",""),
             new_food,
             new_laundry,
-            row.get("near_metro",""),
-            row.get("near_bus",""),
-            row.get("near_rail",""),
+            new_metro,
+            new_bus,
+            new_rail,
             row.get("nearby_places",""),
             row.get("rating",""),
             row.get("notes",""),
