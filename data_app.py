@@ -34,13 +34,9 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gcp"], scope
-)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
 client = gspread.authorize(creds)
-sheet = client.open_by_key(
-    "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
-).sheet1
+sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
 st.title("🏠 PG Manager")
 
@@ -54,7 +50,7 @@ with st.form("pg_form"):
     owner_name = st.text_input("Owner Name")
     owner_number = st.text_input("Owner Number")
 
-    # Sharing
+    # -------- SHARING --------
     if "sharing_data" not in st.session_state:
         st.session_state.sharing_data = [{
             "type": "2 Sharing",
@@ -105,7 +101,7 @@ with st.form("pg_form"):
 
     st.session_state.sharing_data = updated
 
-    # Facilities
+    # -------- FACILITIES --------
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
 
@@ -119,7 +115,7 @@ with st.form("pg_form"):
 
     nearby_places = st.text_input("Nearby Places")
 
-    # Ratings
+    # -------- RATINGS --------
     clean = st.slider("Cleanliness", 1, 10)
     food_rating = st.slider("Food", 1, 10)
     safety = st.slider("Safety", 1, 10)
@@ -132,74 +128,80 @@ with st.form("pg_form"):
 
 # -------- SAVE --------
 if save:
-    rating = round((clean + food_rating + safety + value + crowd)/5,1)
+    if not name:
+        st.error("PG Name required")
+    else:
+        rating = round((clean + food_rating + safety + value + crowd)/5,1)
 
-    row = [
-        name,
-        location,
-        owner_name,
-        owner_number,
-        json.dumps(st.session_state.sharing_data),
-        food_type,
-        laundry,
-        metro_dist,
-        bus_dist,
-        rail_dist,
-        nearby_places,
-        clean,
-        food_rating,
-        safety,
-        value,
-        crowd,
-        rating,
-        notes,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    ]
+        row = [
+            name,
+            location,
+            owner_name,
+            owner_number,
+            json.dumps(st.session_state.sharing_data),
+            food_type,
+            laundry,
+            metro_dist,
+            bus_dist,
+            rail_dist,
+            nearby_places,
+            clean,
+            food_rating,
+            safety,
+            value,
+            crowd,
+            rating,
+            notes,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        ]
 
-    sheet.append_row(row)
-    st.success("Saved!")
-    st.rerun()
+        sheet.append_row(row)
+        st.success("Saved!")
+        st.rerun()
 
-# -------- LOAD --------
+# -------- LOAD DATA --------
 st.subheader("📊 PG Table")
 
 try:
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
 
-    if not df.empty:
-        df.columns = df.columns.str.lower().str.strip()
-    else:
+    if df.empty:
         st.warning("No data found")
+        st.stop()
+
+    df.columns = df.columns.str.lower().str.strip()
 
 except Exception as e:
     st.error("Sheet error")
     st.write(e)
-    df = pd.DataFrame()
+    st.stop()
 
-# -------- TABLE VIEW --------
-if not df.empty:
+# -------- TABLE --------
+show_df = df[["name","location","food_type","laundry","metro_dist","rating"]]
+st.dataframe(show_df, use_container_width=True)
 
-    show_df = df[[
-        "name","location","food_type","laundry","metro_dist","rating"
-    ]]
+# -------- ACTIONS --------
+st.subheader("⚙️ Actions")
 
-    st.dataframe(show_df, use_container_width=True)
+selected = st.selectbox("Select PG", df.index)
 
-    st.subheader("Actions")
+if selected not in df.index:
+    st.stop()
 
-    selected = st.selectbox("Select PG", df.index)
-    row = df.loc[selected]
+row = df.loc[selected]
 
-    col1, col2 = st.columns(2)
+col1, col2 = st.columns(2)
 
-    if col1.button("🗑 Delete Selected"):
-        sheet.delete_rows(selected + 2)
-        st.success("Deleted")
-        st.rerun()
+# DELETE
+if col1.button("🗑 Delete Selected"):
+    sheet.delete_rows(selected + 2)
+    st.success("Deleted")
+    st.rerun()
 
-    if col2.button("✏️ Edit Selected"):
-        st.session_state.edit_index = selected
+# EDIT
+if col2.button("✏️ Edit Selected"):
+    st.session_state.edit_index = selected
 
 # -------- EDIT --------
 if "edit_index" in st.session_state:
@@ -207,7 +209,7 @@ if "edit_index" in st.session_state:
     i = st.session_state.edit_index
     row = df.loc[i]
 
-    st.subheader("Edit PG")
+    st.subheader("✏️ Edit PG")
 
     new_name = st.text_input("Name", value=row.get("name",""))
     new_location = st.text_input("Location", value=row.get("location",""))
