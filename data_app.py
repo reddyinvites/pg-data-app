@@ -3,38 +3,30 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import urllib.parse
 import json
 
-st.set_page_config(page_title="PG Data Pro", layout="wide")
+st.set_page_config(page_title="PG Manager", layout="wide")
 
 # -------- LOGIN --------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 def login():
-    st.markdown("## 👋 Welcome Admin")
     st.title("🔐 Admin Login")
-
-    with st.form("login_form"):
-        username = st.text_input("Username")
-        password = st.text_input("Password", type="password")
+    with st.form("login"):
+        u = st.text_input("Username")
+        p = st.text_input("Password", type="password")
 
         if st.form_submit_button("Login"):
-            if username == "admin" and password == "1234":
+            if u == "admin" and p == "1234":
                 st.session_state.logged_in = True
-                st.success("Login successful ✅")
                 st.rerun()
             else:
-                st.error("Invalid credentials ❌")
+                st.error("Invalid")
 
 if not st.session_state.logged_in:
     login()
     st.stop()
-
-# -------- LOGOUT --------
-st.sidebar.button("🚪 Logout", on_click=lambda: st.session_state.update({"logged_in": False}))
-st.sidebar.success("Logged in as Admin")
 
 # -------- GOOGLE SHEETS --------
 scope = [
@@ -42,156 +34,152 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gcp"], scope
-)
-
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
 client = gspread.authorize(creds)
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
-st.title("🏠 PG Data Collector PRO")
+st.title("🏠 PG Manager")
 
 # -------- FORM --------
-with st.form("form"):
+with st.form("pg_form"):
 
     st.subheader("🏠 Basic Info")
     name = st.text_input("PG Name")
     location = st.selectbox("Location", ["ameerpet", "madhapur", "hitech city", "sr nagar"])
-    owner = st.text_input("Owner Name")
 
-    st.subheader("💰 Sharing + Price + Deposit")
+    st.subheader("👤 Owner")
+    owner_name = st.text_input("Owner Name")
+    owner_number = st.text_input("Owner Number")
+
+    # -------- SHARING --------
+    st.subheader("💰 Sharing Details")
 
     if "sharing_data" not in st.session_state:
-        st.session_state.sharing_data = [{"type": "2 Sharing", "price": 6000, "deposit": 2000}]
+        st.session_state.sharing_data = [{
+            "type": "2 Sharing",
+            "price": 6000,
+            "deposit": 2000,
+            "total_beds": 10,
+            "available_beds": 3
+        }]
 
     if st.form_submit_button("➕ Add Sharing"):
-        st.session_state.sharing_data.append({"type": "3 Sharing", "price": 5000, "deposit": 2000})
+        st.session_state.sharing_data.append({
+            "type": "3 Sharing",
+            "price": 5000,
+            "deposit": 2000,
+            "total_beds": 10,
+            "available_beds": 2
+        })
         st.rerun()
 
-    updated_data = []
+    updated = []
 
-    for i, item in enumerate(st.session_state.sharing_data):
+    for i, s in enumerate(st.session_state.sharing_data):
 
-        col1, col2, col3, col4 = st.columns([2,2,2,1])
+        st.markdown(f"### 🛏 Sharing {i+1}")
+
+        col1, col2, col3 = st.columns(3)
 
         with col1:
-            share_type = st.selectbox(
-                f"Sharing {i+1}",
+            share_type = st.selectbox("Type",
                 ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
-                index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(item["type"]),
+                index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(s["type"]),
                 key=f"type_{i}"
             )
 
         with col2:
-            price = st.number_input(f"Price {i+1}", 3000, 20000, value=item["price"], key=f"price_{i}")
+            price = st.number_input("Price", value=s["price"], key=f"price_{i}")
 
         with col3:
-            deposit = st.number_input(f"Deposit {i+1}", 0, 50000, value=item["deposit"], key=f"dep_{i}")
+            deposit = st.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
+
+        col4, col5, col6 = st.columns(3)
 
         with col4:
-            if st.form_submit_button("❌", key=f"del_{i}"):
+            total_beds = st.number_input("Total Beds", value=s["total_beds"], key=f"tb_{i}")
+
+        with col5:
+            available_beds = st.number_input("Available Beds", value=s["available_beds"], key=f"ab_{i}")
+
+        with col6:
+            if st.form_submit_button("❌ Remove", key=f"del_{i}"):
                 st.session_state.sharing_data.pop(i)
                 st.rerun()
 
-        updated_data.append({"type": share_type, "price": price, "deposit": deposit})
+        updated.append({
+            "type": share_type,
+            "price": price,
+            "deposit": deposit,
+            "total_beds": total_beds,
+            "available_beds": available_beds
+        })
 
-    st.session_state.sharing_data = updated_data
+    st.session_state.sharing_data = updated
 
-    st.subheader("📍 Location + Facilities")
-    metro = st.number_input("Metro Distance (meters)", 0, 5000)
-    nearby = st.text_input("Nearby Places")
-    laundry = st.selectbox("Laundry", ["Yes", "No"])
-
+    # -------- OTHER --------
     st.subheader("⭐ Ratings")
     clean = st.slider("Cleanliness", 1, 10)
-    food_rating = st.slider("Food", 1, 10)
+    food = st.slider("Food", 1, 10)
     safety = st.slider("Safety", 1, 10)
     value = st.slider("Value", 1, 10)
-    crowd_rating = st.slider("Crowd Quality", 1, 10)
+    crowd = st.slider("Crowd", 1, 10)
 
-    st.subheader("👥 Other")
-    beds = st.number_input("Available Beds", 0, 100)
-    food = st.selectbox("Food Available", ["Yes", "No"])
-    crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
-    contact = st.text_input("Phone")
     notes = st.text_area("Notes")
 
+    preview = st.form_submit_button("👁 Preview")
     save = st.form_submit_button("💾 Save")
+
+# -------- PREVIEW --------
+if preview:
+    st.json({
+        "name": name,
+        "location": location,
+        "owner": owner_name,
+        "sharing": st.session_state.sharing_data
+    })
 
 # -------- SAVE --------
 if save:
-    if not name or not contact:
-        st.error("Name & Contact required")
-    else:
-        rating = round((clean + food_rating + safety + value + crowd_rating) / 5, 1)
-        sharing_json = json.dumps(st.session_state.sharing_data)
+    rating = round((clean + food + safety + value + crowd)/5,1)
 
-        row = [
-            name, location, owner, sharing_json, beds,
-            food, laundry, metro, nearby,
-            clean, food_rating, safety, value, crowd_rating,
-            rating, crowd, contact, notes,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ]
+    row = [
+        name,
+        location,
+        owner_name,
+        owner_number,
+        json.dumps(st.session_state.sharing_data),
+        rating,
+        notes,
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ]
 
-        sheet.append_row(row)
-        st.success("Saved!")
-        st.rerun()
+    sheet.append_row(row)
+    st.success("Saved!")
+    st.rerun()
 
-# -------- LOAD DATA (SAFE) --------
+# -------- LOAD --------
 st.subheader("📊 PG List")
 
 try:
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-
-    if not df.empty:
-        df.columns = df.columns.str.lower()
-
+    df.columns = df.columns.str.lower()
 except:
-    st.error("⚠️ Error loading data")
     df = pd.DataFrame()
 
-# -------- FILTER --------
-search = st.text_input("Search")
-loc = st.selectbox("Filter Location", ["All", "ameerpet", "madhapur", "hitech city", "sr nagar"])
+if not df.empty:
+    st.dataframe(df)
+
+# -------- CRUD --------
+st.subheader("✏️ Edit / Delete")
 
 if not df.empty:
+    idx = st.selectbox("Select PG", df.index)
+    row = df.loc[idx]
 
-    if search:
-        df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)]
+    st.write("Selected:", row.get("name"))
 
-    if loc != "All":
-        df = df[df["location"].astype(str).str.lower() == loc.lower()]
-
-    st.dataframe(df, use_container_width=True)
-
-# -------- SHARING DETAILS --------
-st.subheader("💰 Sharing Details")
-
-if not df.empty:
-    i = st.selectbox("Select PG", df.index)
-    row = df.loc[i]
-
-    if "sharing_json" in row and row["sharing_json"]:
-        try:
-            sharing_data = json.loads(row["sharing_json"])
-            for s in sharing_data:
-                st.write(f"{s['type']} → ₹{s['price']} (Deposit ₹{s['deposit']})")
-        except:
-            st.warning("⚠️ Sharing data error")
-
-# -------- WHATSAPP --------
-st.subheader("📲 Contact PG")
-
-if not df.empty:
-    msg = f"Hi, I am interested in {row.get('name','PG')}"
-    url = f"https://wa.me/{row.get('contact','')}?text={urllib.parse.quote(msg)}"
-    st.markdown(f"[👉 Chat on WhatsApp]({url})")
-
-# -------- DELETE --------
-if not df.empty:
-    if st.button("🗑 Delete Selected"):
-        sheet.delete_rows(i + 2)
-        st.success("Deleted!")
+    if st.button("🗑 Delete"):
+        sheet.delete_rows(idx+2)
         st.rerun()
