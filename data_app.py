@@ -13,16 +13,25 @@ if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 def login():
+    st.markdown("## 👋 Welcome Admin")
     st.title("🔐 Admin Login")
-    u = st.text_input("Username")
-    p = st.text_input("Password", type="password")
 
-    if st.button("Login"):
-        if u == st.secrets["auth"]["username"] and p == st.secrets["auth"]["password"]:
-            st.session_state.logged_in = True
-            st.rerun()
-        else:
-            st.error("Invalid credentials")
+    with st.form("login_form"):
+        username = st.text_input("Username")
+        password = st.text_input("Password", type="password")
+
+        login_btn = st.form_submit_button("Login")
+
+        if login_btn:
+            if (
+                username == st.secrets["auth"]["username"]
+                and password == st.secrets["auth"]["password"]
+            ):
+                st.session_state.logged_in = True
+                st.success("Login successful ✅")
+                st.rerun()
+            else:
+                st.error("Invalid credentials ❌")
 
 if not st.session_state.logged_in:
     login()
@@ -34,9 +43,14 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["gcp"], scope
+)
+
 client = gspread.authorize(creds)
-sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
+sheet = client.open_by_key(
+    "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
+).sheet1
 
 st.title("🏠 PG Data Collector")
 
@@ -50,17 +64,16 @@ with st.form("form"):
     st.subheader("💰 Sharing & Pricing")
 
     if "sharing_data" not in st.session_state:
-        st.session_state.sharing_data = [
-            {"type": "2 Sharing", "price": 6000}
-        ]
+        st.session_state.sharing_data = [{"type": "2 Sharing", "price": 6000}]
 
-    if st.form_submit_button("➕ Add Sharing"):
+    add_btn = st.form_submit_button("➕ Add Sharing")
+
+    if add_btn:
         st.session_state.sharing_data.append({"type": "3 Sharing", "price": 5000})
 
     updated_data = []
 
     for i, item in enumerate(st.session_state.sharing_data):
-
         col1, col2, col3 = st.columns([2, 2, 1])
 
         with col1:
@@ -89,16 +102,11 @@ with st.form("form"):
     st.session_state.sharing_data = updated_data
 
     st.subheader("Details")
-
     beds = st.number_input("Available Beds", 0, 100)
-
     food = st.selectbox("Food Available", ["Yes", "No"])
     food_rating = st.slider("Food Rating", 1, 10)
-
     clean_rating = st.slider("Cleanliness", 1, 10)
-
     crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
-
     contact = st.text_input("Phone")
     notes = st.text_area("Notes")
 
@@ -110,7 +118,6 @@ if save:
         st.error("Name & Contact required")
     else:
         rating = round((food_rating + clean_rating) / 2, 1)
-
         sharing_json = json.dumps(st.session_state.sharing_data)
 
         row = [
@@ -131,7 +138,7 @@ if save:
         sheet.append_row(row)
         st.success("Saved successfully!")
 
-# -------- LOAD --------
+# -------- LOAD DATA --------
 st.subheader("📊 PG List")
 
 data = sheet.get_all_records()
@@ -150,29 +157,39 @@ if not df.empty:
         df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)]
 
     if loc != "All":
-        df = df[df["location"].str.lower() == loc.lower()]
+        df = df[df["location"].astype(str).str.lower() == loc.lower()]
 
     st.dataframe(df, use_container_width=True)
 
-# -------- SHOW SHARING DETAILS --------
+# -------- SHARING DISPLAY (SAFE) --------
 st.subheader("💰 Sharing Details")
 
 if not df.empty:
     i = st.selectbox("Select PG", df.index)
     row = df.loc[i]
 
-    sharing_data = json.loads(row["sharing_json"])
+    if "sharing_json" in row and row["sharing_json"]:
+        try:
+            sharing_data = json.loads(row["sharing_json"])
 
-    for s in sharing_data:
-        st.write(f"{s['type']} → ₹{s['price']}")
+            for s in sharing_data:
+                st.write(f"{s['type']} → ₹{s['price']}")
+
+        except:
+            st.warning("⚠️ Sharing data error")
+
+    else:
+        if "price" in row:
+            st.write(f"💰 Price: ₹{row['price']}")
+        else:
+            st.info("No pricing data")
 
 # -------- WHATSAPP --------
 st.subheader("📲 Contact PG")
 
 if not df.empty:
-    msg = f"Hi, I am interested in {row['name']} PG"
-    url = f"https://wa.me/{row['contact']}?text={urllib.parse.quote(msg)}"
-
+    msg = f"Hi, I am interested in {row.get('name', 'this PG')}"
+    url = f"https://wa.me/{row.get('contact','')}?text={urllib.parse.quote(msg)}"
     st.markdown(f"[👉 Chat on WhatsApp]({url})")
 
 # -------- DELETE --------
