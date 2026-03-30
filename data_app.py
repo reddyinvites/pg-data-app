@@ -229,4 +229,43 @@ if "edit_index" in st.session_state:
 
     new_name = st.text_input("PG Name", row.get("name",""))
     new_location = st.text_input("Location", row.get("location",""))
-    new_owner
+    new_owner = st.text_input("Owner Name", row.get("owner_name",""))
+    new_number = st.text_input("Owner Number", row.get("owner_number",""))
+
+    new_food = st.selectbox("Food", ["Veg","Non-Veg","Mixed"])
+    new_laundry = st.selectbox("Laundry", ["Yes","No"])
+
+    new_metro = st.number_input("Metro", int(row.get("metro_dist",0)))
+    new_bus = st.number_input("Bus", int(row.get("bus_dist",0)))
+    new_rail = st.number_input("Rail", int(row.get("rail_dist",0)))
+
+    new_near = st.text_input("Nearby", row.get("nearby_places",""))
+
+    new_clean = st.slider("Clean", 1, 10, int(row.get("cleanliness",1)))
+    new_food_rating = st.slider("Food Rating", 1, 10, int(row.get("food_rating",1)))
+    new_safety = st.slider("Safety", 1, 10, int(row.get("safety",1)))
+    new_value = st.slider("Value", 1, 10, int(row.get("value",1)))
+    new_crowd = st.slider("Crowd", 1, 10, int(row.get("crowd",1)))
+
+    new_notes = st.text_area("Notes", row.get("notes",""))
+
+    if st.button("💾 Update"):
+
+        rating = round((new_clean+new_food_rating+new_safety+new_value+new_crowd)/5,1)
+
+        sheet.update(f"A{i+2}:T{i+2}", [[
+            row["pg_id"], new_name, new_location,
+            new_owner, new_number,
+            row["sharing_json"],
+            new_food, new_laundry,
+            new_metro, new_bus, new_rail,
+            new_near,
+            new_clean, new_food_rating, new_safety,
+            new_value, new_crowd,
+            rating, new_notes,
+            row["timestamp"]
+        ]])
+
+        st.success("Updated")
+        del st.session_state.edit_index
+        st.rerun()
