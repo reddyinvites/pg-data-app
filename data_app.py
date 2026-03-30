@@ -43,17 +43,13 @@ st.title("🏠 PG Manager")
 # -------- FORM --------
 with st.form("pg_form"):
 
-    st.subheader("🏠 Basic Info")
     name = st.text_input("PG Name")
     location = st.text_input("Location")
 
-    st.subheader("👤 Owner")
     owner_name = st.text_input("Owner Name")
     owner_number = st.text_input("Owner Number")
 
     # -------- SHARING --------
-    st.subheader("💰 Sharing Details")
-
     if "sharing_data" not in st.session_state:
         st.session_state.sharing_data = [{
             "type": "2 Sharing",
@@ -81,32 +77,16 @@ with st.form("pg_form"):
 
         col1, col2, col3 = st.columns(3)
 
-        with col1:
-            share_type = st.selectbox(
-                "Type",
-                ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
-                index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(s["type"]),
-                key=f"type_{i}"
-            )
+        share_type = col1.selectbox("Type", ["1 Sharing","2 Sharing","3 Sharing","4 Sharing"],
+                                   index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(s["type"]),
+                                   key=f"type_{i}")
 
-        with col2:
-            price = st.number_input("Price", value=s["price"], key=f"price_{i}")
+        price = col2.number_input("Price", value=s["price"], key=f"price_{i}")
+        deposit = col3.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
 
-        with col3:
-            deposit = st.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
-
-        col4, col5, col6 = st.columns(3)
-
-        with col4:
-            total_beds = st.number_input("Total Beds", value=s["total_beds"], key=f"tb_{i}")
-
-        with col5:
-            available_beds = st.number_input("Available Beds", value=s["available_beds"], key=f"ab_{i}")
-
-        with col6:
-            if st.form_submit_button("❌ Remove", key=f"remove_{i}"):
-                st.session_state.sharing_data.pop(i)
-                st.rerun()
+        col4, col5 = st.columns(2)
+        total_beds = col4.number_input("Total Beds", value=s["total_beds"], key=f"tb_{i}")
+        available_beds = col5.number_input("Available Beds", value=s["available_beds"], key=f"ab_{i}")
 
         updated.append({
             "type": share_type,
@@ -119,26 +99,18 @@ with st.form("pg_form"):
     st.session_state.sharing_data = updated
 
     # -------- FACILITIES --------
-    st.subheader("📍 Facilities")
+    food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
+    laundry = st.selectbox("Laundry", ["Yes","No"])
 
-    food_type = st.selectbox("Food Type", ["Veg", "Non-Veg", "Mixed"])
-    laundry = st.selectbox("Laundry", ["Yes", "No"])
+    metro_dist = st.number_input("Metro Distance (meters)", 0)
+    st.caption(f"{metro_dist/1000:.2f} km")
 
-    st.subheader("📏 Distance")
-
-    metro_dist = st.number_input("Metro Distance (meters)", 0, 10000)
-    st.caption(f"≈ {metro_dist/1000:.2f} km")
-
-    bus_dist = st.number_input("Bus Stop Distance (meters)", 0, 10000)
-    st.caption(f"≈ {bus_dist/1000:.2f} km")
-
-    rail_dist = st.number_input("Railway Station Distance (meters)", 0, 20000)
-    st.caption(f"≈ {rail_dist/1000:.2f} km")
+    bus_dist = st.number_input("Bus Distance (meters)", 0)
+    rail_dist = st.number_input("Railway Distance (meters)", 0)
 
     nearby_places = st.text_input("Nearby Places")
 
     # -------- RATINGS --------
-    st.subheader("⭐ Ratings")
     clean = st.slider("Cleanliness", 1, 10)
     food = st.slider("Food", 1, 10)
     safety = st.slider("Safety", 1, 10)
@@ -147,20 +119,7 @@ with st.form("pg_form"):
 
     notes = st.text_area("Notes")
 
-    preview = st.form_submit_button("👁 Preview")
     save = st.form_submit_button("💾 Save")
-
-# -------- PREVIEW --------
-if preview:
-    st.json({
-        "name": name,
-        "sharing": st.session_state.sharing_data,
-        "distances": {
-            "metro": metro_dist,
-            "bus": bus_dist,
-            "rail": rail_dist
-        }
-    })
 
 # -------- SAVE --------
 if save:
@@ -178,6 +137,11 @@ if save:
         bus_dist,
         rail_dist,
         nearby_places,
+        clean,
+        food,
+        safety,
+        value,
+        crowd,
         rating,
         notes,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -193,68 +157,42 @@ st.subheader("📊 PG List")
 try:
     data = sheet.get_all_records()
     df = pd.DataFrame(data)
-    df.columns = df.columns.str.lower()
-except:
+
+    if not df.empty:
+        df.columns = df.columns.str.lower()
+    else:
+        st.warning("No data")
+
+except Exception as e:
+    st.error("Sheet error")
+    st.write(e)
     df = pd.DataFrame()
 
-# -------- DISPLAY + CRUD --------
+# -------- DISPLAY --------
 if not df.empty:
 
     for i in df.index:
 
         with st.expander(f"🏠 {df.loc[i,'name']} ({df.loc[i,'location']})"):
 
-            st.write(df.loc[i])
+            row = df.loc[i]
+
+            st.write(f"⭐ Rating: {row.get('rating','')}")
+            st.write(f"🍽 Food: {row.get('food','')}/10")
+            st.write(f"🧼 Clean: {row.get('cleanliness','')}/10")
+            st.write(f"🛡 Safety: {row.get('safety','')}/10")
+            st.write(f"💰 Value: {row.get('value','')}/10")
+            st.write(f"👥 Crowd: {row.get('crowd','')}/10")
+
+            st.write(f"📍 Metro: {row.get('metro_dist','')} m")
+            st.write(f"🚌 Bus: {row.get('bus_dist','')} m")
+            st.write(f"🚆 Rail: {row.get('rail_dist','')} m")
 
             col1, col2 = st.columns(2)
 
-            with col1:
-                if st.button("🗑 Delete", key=f"delete_{i}_{df.loc[i,'name']}"):
-                    sheet.delete_rows(i+2)
-                    st.rerun()
+            if col1.button("🗑 Delete", key=f"del_{i}_{row.get('name')}"):
+                sheet.delete_rows(i+2)
+                st.rerun()
 
-            with col2:
-                if st.button("✏️ Edit", key=f"edit_{i}_{df.loc[i,'name']}"):
-                    st.session_state.edit_index = i
-
-# -------- EDIT --------
-if "edit_index" in st.session_state:
-
-    st.subheader("✏️ Edit PG")
-
-    i = st.session_state.edit_index
-    row = df.loc[i]
-
-    new_name = st.text_input("Name", row["name"])
-    new_location = st.text_input("Location", row["location"])
-    new_food = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
-    new_laundry = st.selectbox("Laundry", ["Yes","No"])
-
-    new_metro = st.number_input("Metro Distance", value=int(row.get("metro_dist",0)))
-    new_bus = st.number_input("Bus Distance", value=int(row.get("bus_dist",0)))
-    new_rail = st.number_input("Rail Distance", value=int(row.get("rail_dist",0)))
-
-    if st.button("💾 Update"):
-
-        updated_row = [
-            new_name,
-            new_location,
-            row.get("owner_name",""),
-            row.get("owner_number",""),
-            row.get("sharing_json",""),
-            new_food,
-            new_laundry,
-            new_metro,
-            new_bus,
-            new_rail,
-            row.get("nearby_places",""),
-            row.get("rating",""),
-            row.get("notes",""),
-            row.get("timestamp","")
-        ]
-
-        sheet.update(f"A{i+2}:N{i+2}", [updated_row])
-
-        st.success("Updated!")
-        del st.session_state.edit_index
-        st.rerun()
+            if col2.button("✏️ Edit", key=f"edit_{i}_{row.get('name')}"):
+                st.session_state.edit_index = i
