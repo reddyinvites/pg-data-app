@@ -23,17 +23,20 @@ def login():
         login_btn = st.form_submit_button("Login")
 
         if login_btn:
-            # 🔥 HARD CODED LOGIN (NO SECRETS ISSUE)
             if username == "admin" and password == "1234":
                 st.session_state.logged_in = True
                 st.success("Login successful ✅")
-                st.experimental_rerun()
+                st.rerun()   # ✅ FIXED
             else:
                 st.error("Invalid credentials ❌")
 
 if not st.session_state.logged_in:
     login()
     st.stop()
+
+# -------- LOGOUT --------
+st.sidebar.button("🚪 Logout", on_click=lambda: st.session_state.update({"logged_in": False}))
+st.sidebar.success("Logged in as Admin")
 
 # -------- GOOGLE SHEETS --------
 scope = [
@@ -64,8 +67,11 @@ with st.form("form"):
     if "sharing_data" not in st.session_state:
         st.session_state.sharing_data = [{"type": "2 Sharing", "price": 6000}]
 
-    if st.form_submit_button("➕ Add Sharing"):
+    add_btn = st.form_submit_button("➕ Add Sharing")
+
+    if add_btn:
         st.session_state.sharing_data.append({"type": "3 Sharing", "price": 5000})
+        st.rerun()
 
     updated_data = []
 
@@ -91,7 +97,7 @@ with st.form("form"):
         with col3:
             if st.form_submit_button("❌", key=f"del_{i}"):
                 st.session_state.sharing_data.pop(i)
-                st.experimental_rerun()
+                st.rerun()
 
         updated_data.append({"type": share_type, "price": price})
 
@@ -133,6 +139,7 @@ if save:
 
         sheet.append_row(row)
         st.success("Saved successfully!")
+        st.rerun()
 
 # -------- LOAD DATA --------
 st.subheader("📊 PG List")
@@ -157,7 +164,7 @@ if not df.empty:
 
     st.dataframe(df, use_container_width=True)
 
-# -------- SHARING DISPLAY --------
+# -------- SHARING DETAILS --------
 st.subheader("💰 Sharing Details")
 
 if not df.empty:
@@ -190,4 +197,4 @@ if not df.empty:
     if st.button("🗑 Delete Selected"):
         sheet.delete_rows(i + 2)
         st.success("Deleted!")
-        st.experimental_rerun()
+        st.rerun()
