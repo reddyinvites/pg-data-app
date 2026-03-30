@@ -31,7 +31,6 @@ def logout():
     st.session_state.logged_in = False
     st.rerun()
 
-# -------- AUTH CHECK --------
 if not st.session_state.logged_in:
     login()
     st.stop()
@@ -53,7 +52,6 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 )
 
 client = gspread.authorize(creds)
-
 sheet = client.open_by_key(
     "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
 ).sheet1
@@ -89,25 +87,30 @@ with st.form("pg_form"):
 # -------- PREVIEW --------
 if preview_btn:
 
-    clean_notes = " | ".join(
-        [n.strip() for n in notes.split("\n") if n.strip()]
-    )
+    if not name.strip():
+        st.error("⚠️ PG Name is required")
+    elif not contact.strip():
+        st.error("⚠️ Contact is required")
+    else:
+        clean_notes = " | ".join(
+            [n.strip() for n in notes.split("\n") if n.strip()]
+        )
 
-    rating = round((cleanliness + food_quality) / 2, 1)
+        rating = round((cleanliness + food_quality) / 2, 1)
 
-    st.session_state.preview = {
-        "name": name.strip(),
-        "price": price,
-        "location": location,
-        "food": food,
-        "room": room,
-        "cleanliness": cleanliness,
-        "food_quality": food_quality,
-        "rating": rating,
-        "crowd": crowd,
-        "contact": contact.strip(),
-        "notes": clean_notes
-    }
+        st.session_state.preview = {
+            "name": name.strip(),
+            "price": price,
+            "location": location.lower(),
+            "food": food,
+            "room": room,
+            "cleanliness": cleanliness,
+            "food_quality": food_quality,
+            "rating": rating,
+            "crowd": crowd,
+            "contact": contact.strip(),
+            "notes": clean_notes
+        }
 
 
 # -------- SHOW PREVIEW --------
@@ -154,8 +157,8 @@ st.subheader("📊 PG Database")
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
 
-# FIX COLUMN ISSUES
-df.columns = df.columns.str.strip().str.lower()
+if not df.empty:
+    df.columns = df.columns.str.strip().str.lower()
 
 
 # -------- SEARCH + FILTER --------
@@ -174,7 +177,7 @@ if not df.empty:
         df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)]
 
     if location_filter != "All":
-        df = df[df["location"] == location_filter]
+        df = df[df["location"].str.lower() == location_filter.lower()]
 
     st.dataframe(df, use_container_width=True)
 
@@ -182,16 +185,12 @@ if not df.empty:
 # -------- EDIT / DELETE --------
 st.subheader("✏️ Edit / Delete")
 
-def safe_get(row, key):
-    return row[key] if key in row else ""
-
 if not df.empty:
 
     index = st.selectbox("Select Row", df.index)
-
     row_data = df.loc[index]
 
-    st.write("Selected:", safe_get(row_data, "name"))
+    st.write("Selected:", row_data.get("name", ""))
 
     # DELETE
     if st.button("🗑 Delete"):
@@ -199,27 +198,48 @@ if not df.empty:
         st.success("Deleted!")
         st.rerun()
 
-    # EDIT
-    new_name = st.text_input("Edit Name", safe_get(row_data, "name"))
+    # -------- FULL EDIT --------
+    st.markdown("### ✏️ Edit PG Details")
+
+    new_name = st.text_input("Name", row_data.get("name", ""))
+    new_price = st.number_input("Price", value=int(row_data.get("price", 3000)))
+    new_location = st.selectbox(
+        "Location",
+        ["ameerpet", "madhapur", "hitech city", "sr nagar"],
+        index=["ameerpet", "madhapur", "hitech city", "sr nagar"].index(
+            row_data.get("location", "ameerpet")
+        )
+    )
+    new_food = st.selectbox("Food", ["Yes", "No"],
+                           index=["Yes", "No"].index(row_data.get("food", "Yes")))
+    new_room = st.selectbox("Room", ["AC", "Non-AC"],
+                           index=["AC", "Non-AC"].index(row_data.get("room", "AC")))
+
+    new_contact = st.text_input("Contact", row_data.get("contact", ""))
+    new_notes = st.text_area("Notes", row_data.get("notes", ""))
 
     if st.button("💾 Update"):
 
-        updated_row = [
-            str(new_name),
-            str(safe_get(row_data, "price")),
-            str(safe_get(row_data, "location")),
-            str(safe_get(row_data, "food")),
-            str(safe_get(row_data, "room")),
-            str(safe_get(row_data, "cleanliness")),
-            str(safe_get(row_data, "food_quality")),
-            str(safe_get(row_data, "rating")),
-            str(safe_get(row_data, "crowd")),
-            str(safe_get(row_data, "contact")),
-            str(safe_get(row_data, "notes")),
-            str(safe_get(row_data, "created_at"))
-        ]
+        if not new_name.strip():
+            st.error("Name required")
+        else:
 
-        sheet.update(f"A{index+2}:L{index+2}", [updated_row])
+            updated_row = [
+                new_name,
+                new_price,
+                new_location.lower(),
+                new_food,
+                new_room,
+                row_data.get("cleanliness", ""),
+                row_data.get("food_quality", ""),
+                row_data.get("rating", ""),
+                row_data.get("crowd", ""),
+                new_contact,
+                new_notes,
+                row_data.get("timestamp", "")
+            ]
 
-        st.success("Updated!")
-        st.rerun()
+            sheet.update(f"A{index+2}:L{index+2}", [updated_row])
+
+            st.success("Updated!")
+            st.rerun()
