@@ -45,7 +45,7 @@ with st.form("pg_form"):
 
     st.subheader("🏠 Basic Info")
     name = st.text_input("PG Name")
-    location = st.selectbox("Location", ["ameerpet", "madhapur", "hitech city", "sr nagar"])
+    location = st.text_input("Location")
 
     st.subheader("👤 Owner")
     owner_name = st.text_input("Owner Name")
@@ -84,7 +84,7 @@ with st.form("pg_form"):
         with col1:
             share_type = st.selectbox("Type",
                 ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
-                index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(s["type"]),
+                index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(s["type"]),
                 key=f"type_{i}"
             )
 
@@ -117,7 +117,19 @@ with st.form("pg_form"):
 
     st.session_state.sharing_data = updated
 
-    # -------- OTHER --------
+    # -------- FACILITIES --------
+    st.subheader("📍 Facilities")
+
+    food_type = st.selectbox("Food Type", ["Veg", "Non-Veg", "Mixed"])
+    laundry = st.selectbox("Laundry", ["Yes", "No"])
+
+    near_metro = st.checkbox("Near Metro")
+    near_bus = st.checkbox("Near Bus Stop")
+    near_rail = st.checkbox("Near Railway Station")
+
+    nearby_places = st.text_input("Nearby Places")
+
+    # -------- RATINGS --------
     st.subheader("⭐ Ratings")
     clean = st.slider("Cleanliness", 1, 10)
     food = st.slider("Food", 1, 10)
@@ -134,9 +146,13 @@ with st.form("pg_form"):
 if preview:
     st.json({
         "name": name,
-        "location": location,
-        "owner": owner_name,
-        "sharing": st.session_state.sharing_data
+        "sharing": st.session_state.sharing_data,
+        "food": food_type,
+        "location_tags": {
+            "metro": near_metro,
+            "bus": near_bus,
+            "rail": near_rail
+        }
     })
 
 # -------- SAVE --------
@@ -149,6 +165,12 @@ if save:
         owner_name,
         owner_number,
         json.dumps(st.session_state.sharing_data),
+        food_type,
+        laundry,
+        near_metro,
+        near_bus,
+        near_rail,
+        nearby_places,
         rating,
         notes,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
@@ -168,18 +190,60 @@ try:
 except:
     df = pd.DataFrame()
 
+# -------- DISPLAY + CRUD --------
 if not df.empty:
-    st.dataframe(df)
 
-# -------- CRUD --------
-st.subheader("✏️ Edit / Delete")
+    for i in df.index:
 
-if not df.empty:
-    idx = st.selectbox("Select PG", df.index)
-    row = df.loc[idx]
+        with st.expander(f"🏠 {df.loc[i,'name']} ({df.loc[i,'location']})"):
 
-    st.write("Selected:", row.get("name"))
+            st.write(df.loc[i])
 
-    if st.button("🗑 Delete"):
-        sheet.delete_rows(idx+2)
+            col1, col2 = st.columns(2)
+
+            with col1:
+                if st.button("🗑 Delete", key=f"del_{i}"):
+                    sheet.delete_rows(i+2)
+                    st.rerun()
+
+            with col2:
+                if st.button("✏️ Edit", key=f"edit_{i}"):
+                    st.session_state.edit_index = i
+
+# -------- EDIT --------
+if "edit_index" in st.session_state:
+
+    st.subheader("✏️ Edit PG")
+
+    i = st.session_state.edit_index
+    row = df.loc[i]
+
+    new_name = st.text_input("Name", row["name"])
+    new_location = st.text_input("Location", row["location"])
+    new_food = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
+    new_laundry = st.selectbox("Laundry", ["Yes","No"])
+
+    if st.button("💾 Update"):
+
+        updated_row = [
+            new_name,
+            new_location,
+            row.get("owner_name",""),
+            row.get("owner_number",""),
+            row.get("sharing_json",""),
+            new_food,
+            new_laundry,
+            row.get("near_metro",""),
+            row.get("near_bus",""),
+            row.get("near_rail",""),
+            row.get("nearby_places",""),
+            row.get("rating",""),
+            row.get("notes",""),
+            row.get("timestamp","")
+        ]
+
+        sheet.update(f"A{i+2}:N{i+2}", [updated_row])
+
+        st.success("Updated!")
+        del st.session_state.edit_index
         st.rerun()
