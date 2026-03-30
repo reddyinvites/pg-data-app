@@ -3,26 +3,22 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
+import urllib.parse
 
-st.set_page_config(page_title="PG Data Collector", layout="wide")
+st.set_page_config(page_title="PG Data Collector Pro", layout="wide")
 
-# -------- LOGIN SYSTEM --------
+# -------- LOGIN --------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
 
 def login():
     st.title("🔐 Admin Login")
-
-    username = st.text_input("Username")
-    password = st.text_input("Password", type="password")
+    u = st.text_input("Username")
+    p = st.text_input("Password", type="password")
 
     if st.button("Login"):
-        if (
-            username == st.secrets["auth"]["username"]
-            and password == st.secrets["auth"]["password"]
-        ):
+        if u == st.secrets["auth"]["username"] and p == st.secrets["auth"]["password"]:
             st.session_state.logged_in = True
-            st.success("Login successful!")
             st.rerun()
         else:
             st.error("Invalid credentials")
@@ -35,211 +31,149 @@ if not st.session_state.logged_in:
     login()
     st.stop()
 
-# -------- SIDEBAR --------
-st.sidebar.success("Logged in as Admin")
-st.sidebar.button("🚪 Logout", on_click=logout)
+st.sidebar.success("Admin")
+st.sidebar.button("Logout", on_click=logout)
 
-st.title("📝 PG Data Collection")
+st.title("🚀 PG Data Collector PRO")
 
-# -------- GOOGLE SHEETS CONNECT --------
+# -------- GOOGLE SHEETS --------
 scope = [
     "https://spreadsheets.google.com/feeds",
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gcp"], scope
-)
-
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
 client = gspread.authorize(creds)
-sheet = client.open_by_key(
-    "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
-).sheet1
-
+sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
 # -------- FORM --------
 with st.form("pg_form"):
 
+    st.subheader("🏠 Basic Info")
     name = st.text_input("PG Name")
+    location = st.selectbox("Location", ["ameerpet", "madhapur", "hitech city", "sr nagar"])
+    price = st.number_input("Price", 3000, 20000)
 
-    location = st.selectbox(
-        "Location",
-        ["ameerpet", "madhapur", "hitech city", "sr nagar"]
-    )
+    st.subheader("🛏 Room Details")
+    sharing = st.selectbox("Sharing", ["2 Sharing", "3 Sharing", "4 Sharing"])
+    total_beds = st.number_input("Total Beds", 1, 200)
+    available_beds = st.number_input("Available Beds", 0, 200)
+    deposit = st.number_input("Deposit", 0, 50000)
 
-    price = st.number_input("Price (₹)", 3000, 20000, step=500)
-
+    st.subheader("🍽 Food Details")
     food = st.selectbox("Food Available", ["Yes", "No"])
-    room = st.selectbox("Room Type", ["AC", "Non-AC"])
+    food_type = st.selectbox("Veg/Non-Veg", ["Veg", "Non-Veg", "Both"])
+    food_timing = st.text_input("Food Timings")
 
-    cleanliness = st.slider("Cleanliness", 1, 10)
-    food_quality = st.slider("Food Quality", 1, 10)
+    st.subheader("🧼 Hygiene")
+    cleaning = st.selectbox("Cleaning", ["Daily", "Alternate", "Weekly"])
+    laundry = st.selectbox("Laundry", ["Yes", "No"])
+    washroom = st.selectbox("Washroom", ["Attached", "Common"])
 
-    crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
+    st.subheader("📍 Location Intelligence")
+    metro = st.number_input("Metro Distance (meters)", 0, 5000)
+    nearby = st.text_input("Nearby (hospital, gym, store)")
 
-    contact = st.text_input("Contact Number")
+    st.subheader("⭐ Ratings")
+    clean_rating = st.slider("Cleanliness", 1, 10)
+    food_rating = st.slider("Food", 1, 10)
+    safety_rating = st.slider("Safety", 1, 10)
+    value_rating = st.slider("Value", 1, 10)
+    crowd_rating = st.slider("Crowd Quality", 1, 10)
+
+    st.subheader("👥 Crowd")
+    crowd = st.selectbox("Crowd Type", ["Employees", "Students", "Mixed"])
+
+    st.subheader("📞 Contact")
+    contact = st.text_input("Phone")
+    owner = st.text_input("Owner Name")
     notes = st.text_area("Extra Notes")
 
-    preview_btn = st.form_submit_button("👁 Preview")
-    save_btn = st.form_submit_button("💾 Save")
-
+    preview_btn = st.form_submit_button("Preview")
+    save_btn = st.form_submit_button("Save")
 
 # -------- PREVIEW --------
 if preview_btn:
-
-    if not name.strip():
-        st.error("⚠️ PG Name is required")
-    elif not contact.strip():
-        st.error("⚠️ Contact is required")
+    if not name or not contact:
+        st.error("Name & Contact required")
     else:
-        clean_notes = " | ".join(
-            [n.strip() for n in notes.split("\n") if n.strip()]
-        )
-
-        rating = round((cleanliness + food_quality) / 2, 1)
+        rating = round((clean_rating + food_rating + safety_rating + value_rating + crowd_rating) / 5, 1)
 
         st.session_state.preview = {
-            "name": name.strip(),
+            "name": name,
             "price": price,
-            "location": location.lower(),
-            "food": food,
-            "room": room,
-            "cleanliness": cleanliness,
-            "food_quality": food_quality,
+            "location": location,
+            "sharing": sharing,
+            "available": available_beds,
             "rating": rating,
-            "crowd": crowd,
-            "contact": contact.strip(),
-            "notes": clean_notes
+            "contact": contact
         }
-
 
 # -------- SHOW PREVIEW --------
 if "preview" in st.session_state:
-    st.subheader("🔍 Preview")
     st.json(st.session_state.preview)
-
 
 # -------- SAVE --------
 if save_btn:
-
     if "preview" not in st.session_state:
-        st.error("⚠️ Click Preview first")
+        st.error("Preview first")
     else:
-
-        d = st.session_state.preview
+        r = st.session_state.preview
 
         row = [
-            d["name"],
-            d["price"],
-            d["location"],
-            d["food"],
-            d["room"],
-            d["cleanliness"],
-            d["food_quality"],
-            d["rating"],
-            d["crowd"],
-            d["contact"],
-            d["notes"],
+            name, price, location, sharing,
+            total_beds, available_beds, deposit,
+            food, food_type, food_timing,
+            cleaning, laundry, washroom,
+            metro, nearby,
+            clean_rating, food_rating, safety_rating, value_rating, crowd_rating,
+            crowd, contact, owner, notes,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ]
 
-        sheet.append_row(row, value_input_option="USER_ENTERED")
-
-        st.success("✅ Saved!")
-
+        sheet.append_row(row)
+        st.success("Saved!")
         del st.session_state.preview
         st.rerun()
 
-
-# -------- LOAD DATA --------
-st.subheader("📊 PG Database")
+# -------- LOAD --------
+st.subheader("📊 Database")
 
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
 
 if not df.empty:
-    df.columns = df.columns.str.strip().str.lower()
+    df.columns = df.columns.str.lower()
 
-
-# -------- SEARCH + FILTER --------
-st.subheader("🔍 Search & Filter")
-
-search = st.text_input("Search PG")
-
-location_filter = st.selectbox(
-    "Filter Location",
-    ["All", "ameerpet", "madhapur", "hitech city", "sr nagar"]
-)
+# -------- FILTER --------
+search = st.text_input("Search")
+loc = st.selectbox("Filter", ["All", "ameerpet", "madhapur", "hitech city", "sr nagar"])
 
 if not df.empty:
 
     if search:
         df = df[df.apply(lambda r: search.lower() in str(r).lower(), axis=1)]
 
-    if location_filter != "All":
-        df = df[df["location"].str.lower() == location_filter.lower()]
+    if loc != "All":
+        df = df[df["location"].str.lower() == loc.lower()]
 
-    st.dataframe(df, use_container_width=True)
+    st.dataframe(df)
 
-
-# -------- EDIT / DELETE --------
-st.subheader("✏️ Edit / Delete")
+# -------- WHATSAPP BUTTON --------
+st.subheader("📲 Contact PG")
 
 if not df.empty:
+    i = st.selectbox("Select PG", df.index)
+    row = df.loc[i]
 
-    index = st.selectbox("Select Row", df.index)
-    row_data = df.loc[index]
+    msg = f"Hi, I am interested in {row['name']} PG"
+    url = f"https://wa.me/{row['contact']}?text={urllib.parse.quote(msg)}"
 
-    st.write("Selected:", row_data.get("name", ""))
+    st.markdown(f"[👉 Chat on WhatsApp]({url})")
 
-    # DELETE
-    if st.button("🗑 Delete"):
-        sheet.delete_rows(index + 2)
-        st.success("Deleted!")
+# -------- DELETE --------
+if not df.empty:
+    if st.button("Delete Selected"):
+        sheet.delete_rows(i+2)
+        st.success("Deleted")
         st.rerun()
-
-    # -------- FULL EDIT --------
-    st.markdown("### ✏️ Edit PG Details")
-
-    new_name = st.text_input("Name", row_data.get("name", ""))
-    new_price = st.number_input("Price", value=int(row_data.get("price", 3000)))
-    new_location = st.selectbox(
-        "Location",
-        ["ameerpet", "madhapur", "hitech city", "sr nagar"],
-        index=["ameerpet", "madhapur", "hitech city", "sr nagar"].index(
-            row_data.get("location", "ameerpet")
-        )
-    )
-    new_food = st.selectbox("Food", ["Yes", "No"],
-                           index=["Yes", "No"].index(row_data.get("food", "Yes")))
-    new_room = st.selectbox("Room", ["AC", "Non-AC"],
-                           index=["AC", "Non-AC"].index(row_data.get("room", "AC")))
-
-    new_contact = st.text_input("Contact", row_data.get("contact", ""))
-    new_notes = st.text_area("Notes", row_data.get("notes", ""))
-
-    if st.button("💾 Update"):
-
-        if not new_name.strip():
-            st.error("Name required")
-        else:
-
-            updated_row = [
-                new_name,
-                new_price,
-                new_location.lower(),
-                new_food,
-                new_room,
-                row_data.get("cleanliness", ""),
-                row_data.get("food_quality", ""),
-                row_data.get("rating", ""),
-                row_data.get("crowd", ""),
-                new_contact,
-                new_notes,
-                row_data.get("timestamp", "")
-            ]
-
-            sheet.update(f"A{index+2}:L{index+2}", [updated_row])
-
-            st.success("Updated!")
-            st.rerun()
