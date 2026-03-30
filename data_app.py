@@ -34,13 +34,9 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gcp"], scope
-)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
 client = gspread.authorize(creds)
-sheet = client.open_by_key(
-    "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
-).sheet1
+sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
 st.title("🏠 PG Manager")
 
@@ -111,7 +107,7 @@ for i, s in enumerate(st.session_state.sharing_data):
 
 st.session_state.sharing_data = updated
 
-# ➕ Add Sharing
+# ➕ Add sharing
 if st.button("➕ Add Sharing"):
     st.session_state.sharing_data.append({
         "type": "2 Sharing",
@@ -254,3 +250,76 @@ if col1.button("🗑 Delete Selected"):
 
 if col2.button("✏️ Edit Selected"):
     st.session_state.edit_index = selected
+
+# -------- EDIT SECTION --------
+if "edit_index" in st.session_state:
+
+    i = st.session_state.edit_index
+
+    if i not in df.index:
+        st.error("Invalid index")
+        del st.session_state.edit_index
+        st.stop()
+
+    row = df.loc[i]
+
+    st.subheader("✏️ Edit PG")
+
+    new_name = st.text_input("PG Name", value=row.get("name",""))
+    new_location = st.text_input("Location", value=row.get("location",""))
+
+    new_owner = st.text_input("Owner Name", value=row.get("owner_name",""))
+    new_number = st.text_input("Owner Number", value=row.get("owner_number",""))
+
+    new_food = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
+    new_laundry = st.selectbox("Laundry", ["Yes","No"])
+
+    new_metro = st.number_input("Metro Distance", value=int(row.get("metro_dist",0)))
+    new_bus = st.number_input("Bus Distance", value=int(row.get("bus_dist",0)))
+    new_rail = st.number_input("Rail Distance", value=int(row.get("rail_dist",0)))
+
+    new_clean = st.slider("Cleanliness", 1, 10, int(row.get("cleanliness",1)))
+    new_food_rating = st.slider("Food", 1, 10, int(row.get("food_rating",1)))
+    new_safety = st.slider("Safety", 1, 10, int(row.get("safety",1)))
+    new_value = st.slider("Value", 1, 10, int(row.get("value",1)))
+    new_crowd = st.slider("Crowd", 1, 10, int(row.get("crowd",1)))
+
+    new_notes = st.text_area("Notes", value=row.get("notes",""))
+
+    col1, col2 = st.columns(2)
+
+    if col1.button("💾 Update Now"):
+
+        rating = round((new_clean + new_food_rating + new_safety + new_value + new_crowd)/5,1)
+
+        updated_row = [
+            new_name,
+            new_location,
+            new_owner,
+            new_number,
+            row.get("sharing_json",""),
+            new_food,
+            new_laundry,
+            new_metro,
+            new_bus,
+            new_rail,
+            row.get("nearby_places",""),
+            new_clean,
+            new_food_rating,
+            new_safety,
+            new_value,
+            new_crowd,
+            rating,
+            new_notes,
+            row.get("timestamp","")
+        ]
+
+        sheet.update(f"A{i+2}:S{i+2}", [updated_row])
+
+        st.success("Updated!")
+        del st.session_state.edit_index
+        st.rerun()
+
+    if col2.button("❌ Cancel"):
+        del st.session_state.edit_index
+        st.rerun()
