@@ -4,8 +4,9 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import urllib.parse
+import json
 
-st.set_page_config(page_title="PG Data Collector Pro", layout="wide")
+st.set_page_config(page_title="PG Data App", layout="wide")
 
 # -------- LOGIN --------
 if "logged_in" not in st.session_state:
@@ -23,18 +24,9 @@ def login():
         else:
             st.error("Invalid credentials")
 
-def logout():
-    st.session_state.logged_in = False
-    st.rerun()
-
 if not st.session_state.logged_in:
     login()
     st.stop()
-
-st.sidebar.success("Admin")
-st.sidebar.button("Logout", on_click=logout)
-
-st.title("🚀 PG Data Collector PRO")
 
 # -------- GOOGLE SHEETS --------
 scope = [
@@ -46,98 +38,101 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scop
 client = gspread.authorize(creds)
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
-# -------- FORM --------
-with st.form("pg_form"):
+st.title("🏠 PG Data Collector")
 
-    st.subheader("🏠 Basic Info")
+# -------- FORM --------
+with st.form("form"):
+
+    st.subheader("Basic Info")
     name = st.text_input("PG Name")
     location = st.selectbox("Location", ["ameerpet", "madhapur", "hitech city", "sr nagar"])
-    price = st.number_input("Price", 3000, 20000)
 
-    st.subheader("🛏 Room Details")
-    sharing = st.selectbox("Sharing", ["2 Sharing", "3 Sharing", "4 Sharing"])
-    total_beds = st.number_input("Total Beds", 1, 200)
-    available_beds = st.number_input("Available Beds", 0, 200)
-    deposit = st.number_input("Deposit", 0, 50000)
+    st.subheader("💰 Sharing & Pricing")
 
-    st.subheader("🍽 Food Details")
+    if "sharing_data" not in st.session_state:
+        st.session_state.sharing_data = [
+            {"type": "2 Sharing", "price": 6000}
+        ]
+
+    if st.form_submit_button("➕ Add Sharing"):
+        st.session_state.sharing_data.append({"type": "3 Sharing", "price": 5000})
+
+    updated_data = []
+
+    for i, item in enumerate(st.session_state.sharing_data):
+
+        col1, col2, col3 = st.columns([2, 2, 1])
+
+        with col1:
+            share_type = st.selectbox(
+                f"Sharing {i+1}",
+                ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
+                index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(item["type"]),
+                key=f"type_{i}"
+            )
+
+        with col2:
+            price = st.number_input(
+                f"Price {i+1}",
+                3000, 20000,
+                value=item["price"],
+                key=f"price_{i}"
+            )
+
+        with col3:
+            if st.form_submit_button("❌", key=f"del_{i}"):
+                st.session_state.sharing_data.pop(i)
+                st.rerun()
+
+        updated_data.append({"type": share_type, "price": price})
+
+    st.session_state.sharing_data = updated_data
+
+    st.subheader("Details")
+
+    beds = st.number_input("Available Beds", 0, 100)
+
     food = st.selectbox("Food Available", ["Yes", "No"])
-    food_type = st.selectbox("Veg/Non-Veg", ["Veg", "Non-Veg", "Both"])
-    food_timing = st.text_input("Food Timings")
+    food_rating = st.slider("Food Rating", 1, 10)
 
-    st.subheader("🧼 Hygiene")
-    cleaning = st.selectbox("Cleaning", ["Daily", "Alternate", "Weekly"])
-    laundry = st.selectbox("Laundry", ["Yes", "No"])
-    washroom = st.selectbox("Washroom", ["Attached", "Common"])
-
-    st.subheader("📍 Location Intelligence")
-    metro = st.number_input("Metro Distance (meters)", 0, 5000)
-    nearby = st.text_input("Nearby (hospital, gym, store)")
-
-    st.subheader("⭐ Ratings")
     clean_rating = st.slider("Cleanliness", 1, 10)
-    food_rating = st.slider("Food", 1, 10)
-    safety_rating = st.slider("Safety", 1, 10)
-    value_rating = st.slider("Value", 1, 10)
-    crowd_rating = st.slider("Crowd Quality", 1, 10)
 
-    st.subheader("👥 Crowd")
-    crowd = st.selectbox("Crowd Type", ["Employees", "Students", "Mixed"])
+    crowd = st.selectbox("Crowd", ["Employees", "Students", "Mixed"])
 
-    st.subheader("📞 Contact")
     contact = st.text_input("Phone")
-    owner = st.text_input("Owner Name")
-    notes = st.text_area("Extra Notes")
+    notes = st.text_area("Notes")
 
-    preview_btn = st.form_submit_button("Preview")
-    save_btn = st.form_submit_button("Save")
+    save = st.form_submit_button("💾 Save")
 
-# -------- PREVIEW --------
-if preview_btn:
+# -------- SAVE --------
+if save:
     if not name or not contact:
         st.error("Name & Contact required")
     else:
-        rating = round((clean_rating + food_rating + safety_rating + value_rating + crowd_rating) / 5, 1)
+        rating = round((food_rating + clean_rating) / 2, 1)
 
-        st.session_state.preview = {
-            "name": name,
-            "price": price,
-            "location": location,
-            "sharing": sharing,
-            "available": available_beds,
-            "rating": rating,
-            "contact": contact
-        }
-
-# -------- SHOW PREVIEW --------
-if "preview" in st.session_state:
-    st.json(st.session_state.preview)
-
-# -------- SAVE --------
-if save_btn:
-    if "preview" not in st.session_state:
-        st.error("Preview first")
-    else:
-        r = st.session_state.preview
+        sharing_json = json.dumps(st.session_state.sharing_data)
 
         row = [
-            name, price, location, sharing,
-            total_beds, available_beds, deposit,
-            food, food_type, food_timing,
-            cleaning, laundry, washroom,
-            metro, nearby,
-            clean_rating, food_rating, safety_rating, value_rating, crowd_rating,
-            crowd, contact, owner, notes,
+            name,
+            location,
+            sharing_json,
+            beds,
+            food,
+            food_rating,
+            clean_rating,
+            rating,
+            crowd,
+            contact,
+            notes,
             datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         ]
 
         sheet.append_row(row)
-        st.success("Saved!")
-        del st.session_state.preview
-        st.rerun()
+        st.success("Saved successfully!")
 
 # -------- LOAD --------
-st.subheader("📊 Database")
+st.subheader("📊 PG List")
 
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
@@ -147,7 +142,7 @@ if not df.empty:
 
 # -------- FILTER --------
 search = st.text_input("Search")
-loc = st.selectbox("Filter", ["All", "ameerpet", "madhapur", "hitech city", "sr nagar"])
+loc = st.selectbox("Filter Location", ["All", "ameerpet", "madhapur", "hitech city", "sr nagar"])
 
 if not df.empty:
 
@@ -157,15 +152,24 @@ if not df.empty:
     if loc != "All":
         df = df[df["location"].str.lower() == loc.lower()]
 
-    st.dataframe(df)
+    st.dataframe(df, use_container_width=True)
 
-# -------- WHATSAPP BUTTON --------
-st.subheader("📲 Contact PG")
+# -------- SHOW SHARING DETAILS --------
+st.subheader("💰 Sharing Details")
 
 if not df.empty:
     i = st.selectbox("Select PG", df.index)
     row = df.loc[i]
 
+    sharing_data = json.loads(row["sharing_json"])
+
+    for s in sharing_data:
+        st.write(f"{s['type']} → ₹{s['price']}")
+
+# -------- WHATSAPP --------
+st.subheader("📲 Contact PG")
+
+if not df.empty:
     msg = f"Hi, I am interested in {row['name']} PG"
     url = f"https://wa.me/{row['contact']}?text={urllib.parse.quote(msg)}"
 
@@ -173,7 +177,7 @@ if not df.empty:
 
 # -------- DELETE --------
 if not df.empty:
-    if st.button("Delete Selected"):
-        sheet.delete_rows(i+2)
-        st.success("Deleted")
+    if st.button("🗑 Delete Selected"):
+        sheet.delete_rows(i + 2)
+        st.success("Deleted!")
         st.rerun()
