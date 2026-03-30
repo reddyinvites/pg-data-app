@@ -34,9 +34,13 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["gcp"], scope
+)
 client = gspread.authorize(creds)
-sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
+sheet = client.open_by_key(
+    "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
+).sheet1
 
 st.title("🏠 PG Manager")
 
@@ -56,24 +60,15 @@ with st.form("pg_form"):
             "type": "2 Sharing",
             "price": 6000,
             "deposit": 2000,
-            "total_beds": 10,
-            "available_beds": 3
+            "total_beds": 2,
+            "available_beds": 1
         }]
 
-    if st.form_submit_button("➕ Add Sharing"):
-        st.session_state.sharing_data.append({
-            "type": "3 Sharing",
-            "price": 5000,
-            "deposit": 2000,
-            "total_beds": 10,
-            "available_beds": 2
-        })
-        st.rerun()
-
     updated = []
+
     for i, s in enumerate(st.session_state.sharing_data):
 
-        st.markdown(f"### Sharing {i+1}")
+        st.markdown(f"### 🛏 Sharing {i+1}")
 
         col1, col2, col3 = st.columns(3)
 
@@ -84,12 +79,36 @@ with st.form("pg_form"):
             key=f"type_{i}"
         )
 
+        max_beds = int(share_type.split()[0])
+
         price = col2.number_input("Price", value=s["price"], key=f"price_{i}")
         deposit = col3.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
 
-        col4, col5 = st.columns(2)
-        total_beds = col4.number_input("Total Beds", value=s["total_beds"], key=f"tb_{i}")
-        available_beds = col5.number_input("Available Beds", value=s["available_beds"], key=f"ab_{i}")
+        col4, col5, col6 = st.columns(3)
+
+        total_beds = col4.number_input(
+            "Total Beds",
+            min_value=1,
+            max_value=max_beds,
+            value=min(s["total_beds"], max_beds),
+            key=f"tb_{i}"
+        )
+
+        available_beds = col5.number_input(
+            "Available Beds",
+            min_value=0,
+            max_value=total_beds,
+            value=min(s["available_beds"], total_beds),
+            key=f"ab_{i}"
+        )
+
+        # ❌ DELETE ONLY
+        if col6.button("❌ Remove", key=f"del_{i}"):
+            if len(st.session_state.sharing_data) > 1:
+                st.session_state.sharing_data.pop(i)
+                st.rerun()
+            else:
+                st.warning("At least one sharing required")
 
         updated.append({
             "type": share_type,
@@ -100,6 +119,17 @@ with st.form("pg_form"):
         })
 
     st.session_state.sharing_data = updated
+
+    # -------- ADD SHARING (TOP ONLY) --------
+    if st.form_submit_button("➕ Add Sharing"):
+        st.session_state.sharing_data.append({
+            "type": "2 Sharing",
+            "price": 5000,
+            "deposit": 2000,
+            "total_beds": 2,
+            "available_beds": 1
+        })
+        st.rerun()
 
     # -------- FACILITIES --------
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
@@ -124,42 +154,64 @@ with st.form("pg_form"):
 
     notes = st.text_area("Notes")
 
-    save = st.form_submit_button("💾 Save")
+    preview_btn = st.form_submit_button("👁 Preview")
+    save_btn = st.form_submit_button("💾 Save")
+
+# -------- PREVIEW --------
+if preview_btn:
+
+    rating = round((clean + food_rating + safety + value + crowd)/5,1)
+
+    preview_data = {
+        "name": name,
+        "location": location,
+        "sharing": st.session_state.sharing_data,
+        "rating": rating,
+        "notes": notes
+    }
+
+    st.subheader("🔍 Preview")
+    st.json(preview_data)
+
+    st.session_state.preview = preview_data
 
 # -------- SAVE --------
-if save:
-    if not name:
-        st.error("PG Name required")
-    else:
-        rating = round((clean + food_rating + safety + value + crowd)/5,1)
+if save_btn:
 
-        row = [
-            name,
-            location,
-            owner_name,
-            owner_number,
-            json.dumps(st.session_state.sharing_data),
-            food_type,
-            laundry,
-            metro_dist,
-            bus_dist,
-            rail_dist,
-            nearby_places,
-            clean,
-            food_rating,
-            safety,
-            value,
-            crowd,
-            rating,
-            notes,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        ]
+    if "preview" not in st.session_state:
+        st.error("⚠️ Click Preview first")
+        st.stop()
 
-        sheet.append_row(row)
-        st.success("Saved!")
-        st.rerun()
+    rating = round((clean + food_rating + safety + value + crowd)/5,1)
 
-# -------- LOAD DATA --------
+    row = [
+        name,
+        location,
+        owner_name,
+        owner_number,
+        json.dumps(st.session_state.sharing_data),
+        food_type,
+        laundry,
+        metro_dist,
+        bus_dist,
+        rail_dist,
+        nearby_places,
+        clean,
+        food_rating,
+        safety,
+        value,
+        crowd,
+        rating,
+        notes,
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    ]
+
+    sheet.append_row(row)
+    st.success("Saved!")
+    del st.session_state.preview
+    st.rerun()
+
+# -------- LOAD --------
 st.subheader("📊 PG Table")
 
 try:
@@ -193,68 +245,10 @@ row = df.loc[selected]
 
 col1, col2 = st.columns(2)
 
-# DELETE
 if col1.button("🗑 Delete Selected"):
     sheet.delete_rows(selected + 2)
     st.success("Deleted")
     st.rerun()
 
-# EDIT
 if col2.button("✏️ Edit Selected"):
     st.session_state.edit_index = selected
-
-# -------- EDIT --------
-if "edit_index" in st.session_state:
-
-    i = st.session_state.edit_index
-    row = df.loc[i]
-
-    st.subheader("✏️ Edit PG")
-
-    new_name = st.text_input("Name", value=row.get("name",""))
-    new_location = st.text_input("Location", value=row.get("location",""))
-
-    new_food = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
-    new_laundry = st.selectbox("Laundry", ["Yes","No"])
-
-    new_metro = st.number_input("Metro Distance", value=int(row.get("metro_dist",0)))
-    new_bus = st.number_input("Bus Distance", value=int(row.get("bus_dist",0)))
-    new_rail = st.number_input("Rail Distance", value=int(row.get("rail_dist",0)))
-
-    new_clean = st.slider("Cleanliness", 1, 10, int(row.get("cleanliness",1)))
-    new_food_rating = st.slider("Food", 1, 10, int(row.get("food_rating",1)))
-    new_safety = st.slider("Safety", 1, 10, int(row.get("safety",1)))
-    new_value = st.slider("Value", 1, 10, int(row.get("value",1)))
-    new_crowd = st.slider("Crowd", 1, 10, int(row.get("crowd",1)))
-
-    if st.button("💾 Update Now"):
-
-        rating = round((new_clean + new_food_rating + new_safety + new_value + new_crowd)/5,1)
-
-        updated_row = [
-            new_name,
-            new_location,
-            row.get("owner_name",""),
-            row.get("owner_number",""),
-            row.get("sharing_json",""),
-            new_food,
-            new_laundry,
-            new_metro,
-            new_bus,
-            new_rail,
-            row.get("nearby_places",""),
-            new_clean,
-            new_food_rating,
-            new_safety,
-            new_value,
-            new_crowd,
-            rating,
-            row.get("notes",""),
-            row.get("timestamp","")
-        ]
-
-        sheet.update(f"A{i+2}:S{i+2}", [updated_row])
-
-        st.success("Updated!")
-        del st.session_state.edit_index
-        st.rerun()
