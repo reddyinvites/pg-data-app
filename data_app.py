@@ -44,94 +44,95 @@ sheet = client.open_by_key(
 
 st.title("🏠 PG Manager")
 
+# -------- SHARING (OUTSIDE FORM) --------
+if "sharing_data" not in st.session_state:
+    st.session_state.sharing_data = [{
+        "type": "2 Sharing",
+        "price": 6000,
+        "deposit": 2000,
+        "total_beds": 2,
+        "available_beds": 1
+    }]
+
+st.subheader("🛏 Sharing Details")
+
+updated = []
+
+for i, s in enumerate(st.session_state.sharing_data):
+
+    st.markdown(f"### Sharing {i+1}")
+
+    col1, col2, col3 = st.columns(3)
+
+    share_type = col1.selectbox(
+        "Type",
+        ["1 Sharing","2 Sharing","3 Sharing","4 Sharing"],
+        index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(s["type"]),
+        key=f"type_{i}"
+    )
+
+    max_beds = int(share_type.split()[0])
+
+    price = col2.number_input("Price", value=s["price"], key=f"price_{i}")
+    deposit = col3.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
+
+    col4, col5, col6 = st.columns(3)
+
+    total_beds = col4.number_input(
+        "Total Beds",
+        min_value=1,
+        max_value=max_beds,
+        value=min(s["total_beds"], max_beds),
+        key=f"tb_{i}"
+    )
+
+    available_beds = col5.number_input(
+        "Available Beds",
+        min_value=0,
+        max_value=total_beds,
+        value=min(s["available_beds"], total_beds),
+        key=f"ab_{i}"
+    )
+
+    if col6.button("❌ Remove", key=f"del_{i}"):
+        if len(st.session_state.sharing_data) > 1:
+            st.session_state.sharing_data.pop(i)
+            st.rerun()
+        else:
+            st.warning("At least one sharing required")
+
+    updated.append({
+        "type": share_type,
+        "price": price,
+        "deposit": deposit,
+        "total_beds": total_beds,
+        "available_beds": available_beds
+    })
+
+st.session_state.sharing_data = updated
+
+# ➕ Add Sharing
+if st.button("➕ Add Sharing"):
+    st.session_state.sharing_data.append({
+        "type": "2 Sharing",
+        "price": 5000,
+        "deposit": 2000,
+        "total_beds": 2,
+        "available_beds": 1
+    })
+    st.rerun()
+
 # -------- FORM --------
 with st.form("pg_form"):
 
     st.subheader("Basic Info")
+
     name = st.text_input("PG Name")
     location = st.text_input("Location")
 
     owner_name = st.text_input("Owner Name")
     owner_number = st.text_input("Owner Number")
 
-    # -------- SHARING --------
-    if "sharing_data" not in st.session_state:
-        st.session_state.sharing_data = [{
-            "type": "2 Sharing",
-            "price": 6000,
-            "deposit": 2000,
-            "total_beds": 2,
-            "available_beds": 1
-        }]
-
-    updated = []
-
-    for i, s in enumerate(st.session_state.sharing_data):
-
-        st.markdown(f"### 🛏 Sharing {i+1}")
-
-        col1, col2, col3 = st.columns(3)
-
-        share_type = col1.selectbox(
-            "Type",
-            ["1 Sharing","2 Sharing","3 Sharing","4 Sharing"],
-            index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(s["type"]),
-            key=f"type_{i}"
-        )
-
-        max_beds = int(share_type.split()[0])
-
-        price = col2.number_input("Price", value=s["price"], key=f"price_{i}")
-        deposit = col3.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
-
-        col4, col5, col6 = st.columns(3)
-
-        total_beds = col4.number_input(
-            "Total Beds",
-            min_value=1,
-            max_value=max_beds,
-            value=min(s["total_beds"], max_beds),
-            key=f"tb_{i}"
-        )
-
-        available_beds = col5.number_input(
-            "Available Beds",
-            min_value=0,
-            max_value=total_beds,
-            value=min(s["available_beds"], total_beds),
-            key=f"ab_{i}"
-        )
-
-        # ❌ DELETE ONLY
-        if col6.button("❌ Remove", key=f"del_{i}"):
-            if len(st.session_state.sharing_data) > 1:
-                st.session_state.sharing_data.pop(i)
-                st.rerun()
-            else:
-                st.warning("At least one sharing required")
-
-        updated.append({
-            "type": share_type,
-            "price": price,
-            "deposit": deposit,
-            "total_beds": total_beds,
-            "available_beds": available_beds
-        })
-
-    st.session_state.sharing_data = updated
-
-    # -------- ADD SHARING (TOP ONLY) --------
-    if st.form_submit_button("➕ Add Sharing"):
-        st.session_state.sharing_data.append({
-            "type": "2 Sharing",
-            "price": 5000,
-            "deposit": 2000,
-            "total_beds": 2,
-            "available_beds": 1
-        })
-        st.rerun()
-
-    # -------- FACILITIES --------
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
 
@@ -145,7 +146,8 @@ with st.form("pg_form"):
 
     nearby_places = st.text_input("Nearby Places")
 
-    # -------- RATINGS --------
+    st.subheader("Ratings")
+
     clean = st.slider("Cleanliness", 1, 10)
     food_rating = st.slider("Food", 1, 10)
     safety = st.slider("Safety", 1, 10)
