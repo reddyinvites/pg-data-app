@@ -36,11 +36,32 @@ scope = [
 
 creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
 client = gspread.authorize(creds)
+
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
 st.title("🏠 PG Manager")
 
-# -------- SHARING (OUTSIDE FORM) --------
+# -------- LOAD DATA --------
+data = sheet.get_all_records()
+df = pd.DataFrame(data)
+
+if not df.empty:
+    df.columns = df.columns.str.lower().str.strip()
+
+# -------- PG ID GENERATOR --------
+def generate_pg_id(df):
+    if df.empty or "pg_id" not in df.columns:
+        return "PG001"
+    
+    ids = df["pg_id"].dropna().tolist()
+    numbers = [int(i.replace("PG","")) for i in ids if "PG" in str(i)]
+    
+    if not numbers:
+        return "PG001"
+    
+    return f"PG{max(numbers)+1:03d}"
+
+# -------- SHARING --------
 if "sharing_data" not in st.session_state:
     st.session_state.sharing_data = [{
         "type": "2 Sharing",
@@ -50,13 +71,11 @@ if "sharing_data" not in st.session_state:
         "available_beds": 1
     }]
 
-st.subheader("🛏 Sharing Details")
+st.subheader("🛏 Sharing")
 
 updated = []
 
 for i, s in enumerate(st.session_state.sharing_data):
-
-    st.markdown(f"### Sharing {i+1}")
 
     col1, col2, col3 = st.columns(3)
 
@@ -75,17 +94,13 @@ for i, s in enumerate(st.session_state.sharing_data):
     col4, col5, col6 = st.columns(3)
 
     total_beds = col4.number_input(
-        "Total Beds",
-        min_value=1,
-        max_value=max_beds,
+        "Total Beds", 1, max_beds,
         value=min(s["total_beds"], max_beds),
         key=f"tb_{i}"
     )
 
     available_beds = col5.number_input(
-        "Available Beds",
-        min_value=0,
-        max_value=total_beds,
+        "Available Beds", 0, total_beds,
         value=min(s["available_beds"], total_beds),
         key=f"ab_{i}"
     )
@@ -94,8 +109,6 @@ for i, s in enumerate(st.session_state.sharing_data):
         if len(st.session_state.sharing_data) > 1:
             st.session_state.sharing_data.pop(i)
             st.rerun()
-        else:
-            st.warning("At least one sharing required")
 
     updated.append({
         "type": share_type,
@@ -107,7 +120,6 @@ for i, s in enumerate(st.session_state.sharing_data):
 
 st.session_state.sharing_data = updated
 
-# ➕ Add sharing
 if st.button("➕ Add Sharing"):
     st.session_state.sharing_data.append({
         "type": "2 Sharing",
@@ -121,30 +133,21 @@ if st.button("➕ Add Sharing"):
 # -------- FORM --------
 with st.form("pg_form"):
 
-    st.subheader("Basic Info")
-
     name = st.text_input("PG Name")
     location = st.text_input("Location")
-
     owner_name = st.text_input("Owner Name")
     owner_number = st.text_input("Owner Number")
 
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
 
-    st.subheader("Distance")
-
-    metro_dist = st.number_input("Metro Distance (meters)", 0)
-    st.caption(f"{metro_dist/1000:.2f} km")
-
-    bus_dist = st.number_input("Bus Distance (meters)", 0)
-    rail_dist = st.number_input("Railway Distance (meters)", 0)
+    metro_dist = st.number_input("Metro (m)", 0)
+    bus_dist = st.number_input("Bus (m)", 0)
+    rail_dist = st.number_input("Rail (m)", 0)
 
     nearby_places = st.text_input("Nearby Places")
 
-    st.subheader("Ratings")
-
-    clean = st.slider("Cleanliness", 1, 10)
+    clean = st.slider("Clean", 1, 10)
     food_rating = st.slider("Food", 1, 10)
     safety = st.slider("Safety", 1, 10)
     value = st.slider("Value", 1, 10)
@@ -152,37 +155,33 @@ with st.form("pg_form"):
 
     notes = st.text_area("Notes")
 
-    preview_btn = st.form_submit_button("👁 Preview")
-    save_btn = st.form_submit_button("💾 Save")
+    preview = st.form_submit_button("👁 Preview")
+    save = st.form_submit_button("💾 Save")
 
 # -------- PREVIEW --------
-if preview_btn:
-
-    rating = round((clean + food_rating + safety + value + crowd)/5,1)
-
-    preview_data = {
+if preview:
+    rating = round((clean+food_rating+safety+value+crowd)/5,1)
+    st.json({
         "name": name,
         "location": location,
-        "sharing": st.session_state.sharing_data,
         "rating": rating,
-        "notes": notes
-    }
-
-    st.subheader("🔍 Preview")
-    st.json(preview_data)
-
-    st.session_state.preview = preview_data
+        "sharing": st.session_state.sharing_data
+    })
+    st.session_state.preview = True
 
 # -------- SAVE --------
-if save_btn:
+if save:
 
     if "preview" not in st.session_state:
-        st.error("⚠️ Click Preview first")
+        st.error("Click preview first")
         st.stop()
 
-    rating = round((clean + food_rating + safety + value + crowd)/5,1)
+    pg_id = generate_pg_id(df)
 
-    row = [
+    rating = round((clean+food_rating+safety+value+crowd)/5,1)
+
+    sheet.append_row([
+        pg_id,
         name,
         location,
         owner_name,
@@ -202,124 +201,75 @@ if save_btn:
         rating,
         notes,
         datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    ]
+    ])
 
-    sheet.append_row(row)
-    st.success("Saved!")
+    st.success(f"✅ Saved with ID {pg_id}")
     del st.session_state.preview
     st.rerun()
 
-# -------- LOAD --------
+# -------- TABLE --------
 st.subheader("📊 PG Table")
 
-try:
-    data = sheet.get_all_records()
-    df = pd.DataFrame(data)
-
-    if df.empty:
-        st.warning("No data found")
-        st.stop()
-
-    df.columns = df.columns.str.lower().str.strip()
-
-except Exception as e:
-    st.error("Sheet error")
-    st.write(e)
-    st.stop()
-
-# -------- TABLE --------
-show_df = df[["name","location","food_type","laundry","metro_dist","rating"]]
-st.dataframe(show_df, use_container_width=True)
+if df.empty:
+    st.warning("No data")
+else:
+    show = df[["pg_id","name","location","food_type","laundry","rating"]]
+    st.dataframe(show, use_container_width=True)
 
 # -------- ACTIONS --------
 st.subheader("⚙️ Actions")
 
-selected = st.selectbox("Select PG", df.index)
+selected = st.selectbox("Select PG", df.index if not df.empty else [])
 
-if selected not in df.index:
-    st.stop()
+if not df.empty:
 
-row = df.loc[selected]
+    row = df.loc[selected]
 
-col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
-if col1.button("🗑 Delete Selected"):
-    sheet.delete_rows(selected + 2)
-    st.success("Deleted")
-    st.rerun()
+    if col1.button("🗑 Delete"):
+        sheet.delete_rows(selected+2)
+        st.rerun()
 
-if col2.button("✏️ Edit Selected"):
-    st.session_state.edit_index = selected
+    if col2.button("✏️ Edit"):
+        st.session_state.edit_index = selected
 
-# -------- EDIT SECTION --------
+# -------- EDIT --------
 if "edit_index" in st.session_state:
 
     i = st.session_state.edit_index
-
-    if i not in df.index:
-        st.error("Invalid index")
-        del st.session_state.edit_index
-        st.stop()
-
     row = df.loc[i]
 
     st.subheader("✏️ Edit PG")
 
-    new_name = st.text_input("PG Name", value=row.get("name",""))
-    new_location = st.text_input("Location", value=row.get("location",""))
+    new_name = st.text_input("PG Name", row["name"])
+    new_location = st.text_input("Location", row["location"])
 
-    new_owner = st.text_input("Owner Name", value=row.get("owner_name",""))
-    new_number = st.text_input("Owner Number", value=row.get("owner_number",""))
+    if st.button("💾 Update"):
 
-    new_food = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
-    new_laundry = st.selectbox("Laundry", ["Yes","No"])
-
-    new_metro = st.number_input("Metro Distance", value=int(row.get("metro_dist",0)))
-    new_bus = st.number_input("Bus Distance", value=int(row.get("bus_dist",0)))
-    new_rail = st.number_input("Rail Distance", value=int(row.get("rail_dist",0)))
-
-    new_clean = st.slider("Cleanliness", 1, 10, int(row.get("cleanliness",1)))
-    new_food_rating = st.slider("Food", 1, 10, int(row.get("food_rating",1)))
-    new_safety = st.slider("Safety", 1, 10, int(row.get("safety",1)))
-    new_value = st.slider("Value", 1, 10, int(row.get("value",1)))
-    new_crowd = st.slider("Crowd", 1, 10, int(row.get("crowd",1)))
-
-    new_notes = st.text_area("Notes", value=row.get("notes",""))
-
-    col1, col2 = st.columns(2)
-
-    if col1.button("💾 Update Now"):
-
-        rating = round((new_clean + new_food_rating + new_safety + new_value + new_crowd)/5,1)
-
-        updated_row = [
+        sheet.update(f"A{i+2}:T{i+2}", [[
+            row["pg_id"],   # KEEP SAME ID
             new_name,
             new_location,
-            new_owner,
-            new_number,
-            row.get("sharing_json",""),
-            new_food,
-            new_laundry,
-            new_metro,
-            new_bus,
-            new_rail,
-            row.get("nearby_places",""),
-            new_clean,
-            new_food_rating,
-            new_safety,
-            new_value,
-            new_crowd,
-            rating,
-            new_notes,
-            row.get("timestamp","")
-        ]
+            row["owner_name"],
+            row["owner_number"],
+            row["sharing_json"],
+            row["food_type"],
+            row["laundry"],
+            row["metro_dist"],
+            row["bus_dist"],
+            row["rail_dist"],
+            row["nearby_places"],
+            row["cleanliness"],
+            row["food_rating"],
+            row["safety"],
+            row["value"],
+            row["crowd"],
+            row["rating"],
+            row["notes"],
+            row["timestamp"]
+        ]])
 
-        sheet.update(f"A{i+2}:S{i+2}", [updated_row])
-
-        st.success("Updated!")
-        del st.session_state.edit_index
-        st.rerun()
-
-    if col2.button("❌ Cancel"):
+        st.success("Updated")
         del st.session_state.edit_index
         st.rerun()
