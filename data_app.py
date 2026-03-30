@@ -23,13 +23,11 @@ def login():
         login_btn = st.form_submit_button("Login")
 
         if login_btn:
-            if (
-                username == st.secrets["auth"]["username"]
-                and password == st.secrets["auth"]["password"]
-            ):
+            # 🔥 HARD CODED LOGIN (NO SECRETS ISSUE)
+            if username == "admin" and password == "1234":
                 st.session_state.logged_in = True
                 st.success("Login successful ✅")
-                st.rerun()
+                st.experimental_rerun()
             else:
                 st.error("Invalid credentials ❌")
 
@@ -66,9 +64,7 @@ with st.form("form"):
     if "sharing_data" not in st.session_state:
         st.session_state.sharing_data = [{"type": "2 Sharing", "price": 6000}]
 
-    add_btn = st.form_submit_button("➕ Add Sharing")
-
-    if add_btn:
+    if st.form_submit_button("➕ Add Sharing"):
         st.session_state.sharing_data.append({"type": "3 Sharing", "price": 5000})
 
     updated_data = []
@@ -95,7 +91,7 @@ with st.form("form"):
         with col3:
             if st.form_submit_button("❌", key=f"del_{i}"):
                 st.session_state.sharing_data.pop(i)
-                st.rerun()
+                st.experimental_rerun()
 
         updated_data.append({"type": share_type, "price": price})
 
@@ -161,7 +157,7 @@ if not df.empty:
 
     st.dataframe(df, use_container_width=True)
 
-# -------- SHARING DISPLAY (SAFE) --------
+# -------- SHARING DISPLAY --------
 st.subheader("💰 Sharing Details")
 
 if not df.empty:
@@ -171,13 +167,10 @@ if not df.empty:
     if "sharing_json" in row and row["sharing_json"]:
         try:
             sharing_data = json.loads(row["sharing_json"])
-
             for s in sharing_data:
                 st.write(f"{s['type']} → ₹{s['price']}")
-
         except:
             st.warning("⚠️ Sharing data error")
-
     else:
         if "price" in row:
             st.write(f"💰 Price: ₹{row['price']}")
@@ -197,4 +190,4 @@ if not df.empty:
     if st.button("🗑 Delete Selected"):
         sheet.delete_rows(i + 2)
         st.success("Deleted!")
-        st.rerun()
+        st.experimental_rerun()
