@@ -133,6 +133,10 @@ with st.form("pg_form"):
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
 
+    # ✅ NEW FIELDS
+    room_type = st.selectbox("Room Type", ["AC", "Non AC", "Mixed"])
+    gender = st.selectbox("Gender", ["Male", "Female", "Mixed"])
+
     metro_dist = st.number_input("Metro (m)", 0)
     bus_dist = st.number_input("Bus (m)", 0)
     rail_dist = st.number_input("Rail (m)", 0)
@@ -154,7 +158,6 @@ with st.form("pg_form"):
 if preview:
     rating = round((clean+food_rating+safety+value+crowd)/5,1)
     st.json({"name": name, "location": location, "rating": rating})
-
     st.session_state.preview = True
 
 # -------- SAVE --------
@@ -171,6 +174,7 @@ if save:
         pg_id, name, location, owner_name, owner_number,
         json.dumps(st.session_state.sharing_data),
         food_type, laundry,
+        room_type, gender,
         metro_dist, bus_dist, rail_dist,
         nearby_places,
         clean, food_rating, safety, value, crowd,
@@ -180,7 +184,6 @@ if save:
 
     st.success(f"✅ Saved {pg_id}")
 
-    # 🔥 CLEAR FORM
     st.session_state.sharing_data = [{
         "type": "2 Sharing",
         "price": 6000,
@@ -200,7 +203,7 @@ st.subheader("📊 PG Table")
 if df.empty:
     st.warning("No data")
 else:
-    cols = ["pg_id","name","location","food_type","laundry","rating"]
+    cols = ["pg_id","name","location","food_type","room_type","gender","laundry","rating"]
     available = [c for c in cols if c in df.columns]
     st.dataframe(df[available], use_container_width=True)
 
@@ -235,14 +238,18 @@ if "edit_index" in st.session_state:
     new_food = st.selectbox("Food", ["Veg","Non-Veg","Mixed"])
     new_laundry = st.selectbox("Laundry", ["Yes","No"])
 
-    new_metro = st.number_input("Metro", int(row.get("metro_dist",0)))
-    new_bus = st.number_input("Bus", int(row.get("bus_dist",0)))
-    new_rail = st.number_input("Rail", int(row.get("rail_dist",0)))
+    # ✅ NEW
+    new_room = st.selectbox("Room Type", ["AC","Non AC","Mixed"])
+    new_gender = st.selectbox("Gender", ["Male","Female","Mixed"])
 
-    new_near = st.text_input("Nearby", row.get("nearby_places",""))
+    new_metro = st.number_input("Metro", int(row.get("metro (m)",0)))
+    new_bus = st.number_input("Bus", int(row.get("bus (m)",0)))
+    new_rail = st.number_input("Rail", int(row.get("rail (m)",0)))
 
-    new_clean = st.slider("Clean", 1, 10, int(row.get("cleanliness",1)))
-    new_food_rating = st.slider("Food Rating", 1, 10, int(row.get("food_rating",1)))
+    new_near = st.text_input("Nearby", row.get("nearby places",""))
+
+    new_clean = st.slider("Clean", 1, 10, int(row.get("clean",1)))
+    new_food_rating = st.slider("Food Rating", 1, 10, int(row.get("food",1)))
     new_safety = st.slider("Safety", 1, 10, int(row.get("safety",1)))
     new_value = st.slider("Value", 1, 10, int(row.get("value",1)))
     new_crowd = st.slider("Crowd", 1, 10, int(row.get("crowd",1)))
@@ -253,17 +260,18 @@ if "edit_index" in st.session_state:
 
         rating = round((new_clean+new_food_rating+new_safety+new_value+new_crowd)/5,1)
 
-        sheet.update(f"A{i+2}:T{i+2}", [[
+        sheet.update(f"A{i+2}:V{i+2}", [[
             row["pg_id"], new_name, new_location,
             new_owner, new_number,
-            row["sharing_json"],
+            row.get("sharing_json",""),
             new_food, new_laundry,
+            new_room, new_gender,
             new_metro, new_bus, new_rail,
             new_near,
             new_clean, new_food_rating, new_safety,
             new_value, new_crowd,
             rating, new_notes,
-            row["timestamp"]
+            row.get("timestamp","")
         ]])
 
         st.success("Updated")
