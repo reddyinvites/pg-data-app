@@ -133,9 +133,9 @@ with st.form("pg_form"):
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
 
-    # ✅ NEW FIELDS
+    # ✅ Room + Gender
     room_type = st.selectbox("Room Type", ["AC", "Non AC", "Mixed"])
-    gender = st.selectbox("Gender", ["Male", "Female", "Mixed"])
+    gender = st.selectbox("Gender", ["Male", "Female"])
 
     metro_dist = st.number_input("Metro (m)", 0)
     bus_dist = st.number_input("Bus (m)", 0)
@@ -238,9 +238,18 @@ if "edit_index" in st.session_state:
     new_food = st.selectbox("Food", ["Veg","Non-Veg","Mixed"])
     new_laundry = st.selectbox("Laundry", ["Yes","No"])
 
-    # ✅ NEW
     new_room = st.selectbox("Room Type", ["AC","Non AC","Mixed"])
-    new_gender = st.selectbox("Gender", ["Male","Female","Mixed"])
+
+    # ✅ SAFE GENDER FIX
+    existing_gender = row.get("gender","Male")
+    if existing_gender not in ["Male","Female"]:
+        existing_gender = "Male"
+
+    new_gender = st.selectbox(
+        "Gender",
+        ["Male","Female"],
+        index=["Male","Female"].index(existing_gender)
+    )
 
     new_metro = st.number_input("Metro", int(row.get("metro (m)",0)))
     new_bus = st.number_input("Bus", int(row.get("bus (m)",0)))
