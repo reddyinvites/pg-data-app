@@ -133,7 +133,6 @@ with st.form("pg_form"):
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
 
-    # ✅ Room + Gender
     room_type = st.selectbox("Room Type", ["AC", "Non AC", "Mixed"])
     gender = st.selectbox("Gender", ["Male", "Female"])
 
@@ -170,17 +169,36 @@ if save:
     pg_id = generate_pg_id(df)
     rating = round((clean+food_rating+safety+value+crowd)/5,1)
 
-    sheet.append_row([
-        pg_id, name, location, owner_name, owner_number,
-        json.dumps(st.session_state.sharing_data),
-        food_type, laundry,
-        room_type, gender,
-        metro_dist, bus_dist, rail_dist,
-        nearby_places,
-        clean, food_rating, safety, value, crowd,
-        rating, notes,
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    ])
+    # ✅ FIXED SAFE SAVE (NO COLUMN MISMATCH)
+    headers = sheet.row_values(1)
+
+    row_data = {
+        "pg_id": pg_id,
+        "pg_name": name,
+        "location": location,
+        "owner_name": owner_name,
+        "owner_number": owner_number,
+        "sharing_json": json.dumps(st.session_state.sharing_data),
+        "food_type": food_type,
+        "laundry": laundry,
+        "room_type": room_type,
+        "gender": gender,
+        "metro (m)": metro_dist,
+        "bus (m)": bus_dist,
+        "rail (m)": rail_dist,
+        "nearby places": nearby_places,
+        "clean": clean,
+        "food": food_rating,
+        "safety": safety,
+        "value": value,
+        "crowd": crowd,
+        "rating": rating,
+        "notes": notes,
+        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    }
+
+    final_row = [row_data.get(h, "") for h in headers]
+    sheet.append_row(final_row)
 
     st.success(f"✅ Saved {pg_id}")
 
@@ -203,7 +221,7 @@ st.subheader("📊 PG Table")
 if df.empty:
     st.warning("No data")
 else:
-    cols = ["pg_id","name","location","food_type","room_type","gender","laundry","rating"]
+    cols = ["pg_id","pg_name","location","food_type","room_type","gender","laundry","rating"]
     available = [c for c in cols if c in df.columns]
     st.dataframe(df[available], use_container_width=True)
 
@@ -230,24 +248,20 @@ if "edit_index" in st.session_state:
 
     st.subheader("✏️ Edit PG")
 
-    new_name = st.text_input("PG Name", row.get("name",""))
+    new_name = st.text_input("PG Name", row.get("pg_name",""))
     new_location = st.text_input("Location", row.get("location",""))
     new_owner = st.text_input("Owner Name", row.get("owner_name",""))
     new_number = st.text_input("Owner Number", row.get("owner_number",""))
 
     new_food = st.selectbox("Food", ["Veg","Non-Veg","Mixed"])
     new_laundry = st.selectbox("Laundry", ["Yes","No"])
-
     new_room = st.selectbox("Room Type", ["AC","Non AC","Mixed"])
 
-    # ✅ SAFE GENDER FIX
     existing_gender = row.get("gender","Male")
     if existing_gender not in ["Male","Female"]:
         existing_gender = "Male"
 
-    new_gender = st.selectbox(
-        "Gender",
-        ["Male","Female"],
+    new_gender = st.selectbox("Gender", ["Male","Female"],
         index=["Male","Female"].index(existing_gender)
     )
 
