@@ -48,6 +48,19 @@ df = pd.DataFrame(data)
 if not df.empty:
     df.columns = df.columns.str.lower().str.strip()
 
+# -------- HEADER FIX --------
+def normalize_header(h):
+    h = h.lower().strip()
+    mapping = {
+        "metro_dist": "metro (m)",
+        "bus_dist": "bus (m)",
+        "rail_dist": "rail (m)",
+        "nearby_places": "nearby places",
+        "cleanliness": "clean",
+        "food_rating": "food"
+    }
+    return mapping.get(h, h)
+
 # -------- PG ID --------
 def generate_pg_id(df):
     if df.empty or "pg_id" not in df.columns:
@@ -169,7 +182,6 @@ if save:
     pg_id = generate_pg_id(df)
     rating = round((clean+food_rating+safety+value+crowd)/5,1)
 
-    # ✅ FIXED SAFE SAVE (NO COLUMN MISMATCH)
     headers = sheet.row_values(1)
 
     row_data = {
@@ -197,7 +209,9 @@ if save:
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    final_row = [row_data.get(h, "") for h in headers]
+    # ✅ FIXED LINE
+    final_row = [row_data.get(normalize_header(h), "") for h in headers]
+
     sheet.append_row(final_row)
 
     st.success(f"✅ Saved {pg_id}")
