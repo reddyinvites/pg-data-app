@@ -7,6 +7,22 @@ import json
 
 st.set_page_config(page_title="PG Manager", layout="wide")
 
+# -------- RESET FORM --------
+def reset_form():
+    # clear sharing inputs
+    for key in list(st.session_state.keys()):
+        if key.startswith(("type_", "price_", "dep_", "tb_", "ab_")):
+            del st.session_state[key]
+
+    # clear text inputs
+    keys_to_clear = [
+        "name","location","owner_name","owner_number",
+        "nearby_places","notes"
+    ]
+    for k in keys_to_clear:
+        if k in st.session_state:
+            del st.session_state[k]
+
 # -------- LOGIN --------
 if "logged_in" not in st.session_state:
     st.session_state.logged_in = False
@@ -138,10 +154,10 @@ if st.button("➕ Add Sharing"):
 # -------- FORM --------
 with st.form("pg_form"):
 
-    name = st.text_input("PG Name")
-    location = st.text_input("Location")
-    owner_name = st.text_input("Owner Name")
-    owner_number = st.text_input("Owner Number")
+    name = st.text_input("PG Name", key="name")
+    location = st.text_input("Location", key="location")
+    owner_name = st.text_input("Owner Name", key="owner_name")
+    owner_number = st.text_input("Owner Number", key="owner_number")
 
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])
     laundry = st.selectbox("Laundry", ["Yes","No"])
@@ -153,7 +169,7 @@ with st.form("pg_form"):
     bus_dist = st.number_input("Bus (m)", 0)
     rail_dist = st.number_input("Rail (m)", 0)
 
-    nearby_places = st.text_input("Nearby Places")
+    nearby_places = st.text_input("Nearby Places", key="nearby_places")
 
     clean = st.slider("Clean", 1, 10)
     food_rating = st.slider("Food", 1, 10)
@@ -161,7 +177,7 @@ with st.form("pg_form"):
     value = st.slider("Value", 1, 10)
     crowd = st.slider("Crowd", 1, 10)
 
-    notes = st.text_area("Notes")
+    notes = st.text_area("Notes", key="notes")
 
     preview = st.form_submit_button("👁 Preview")
     save = st.form_submit_button("💾 Save")
@@ -209,13 +225,13 @@ if save:
         "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
 
-    # ✅ FIXED LINE
     final_row = [row_data.get(normalize_header(h), "") for h in headers]
 
     sheet.append_row(final_row)
 
     st.success(f"✅ Saved {pg_id}")
 
+    # RESET EVERYTHING
     st.session_state.sharing_data = [{
         "type": "2 Sharing",
         "price": 6000,
@@ -224,93 +240,9 @@ if save:
         "available_beds": 1
     }]
 
+    reset_form()
+
     if "preview" in st.session_state:
         del st.session_state.preview
 
     st.rerun()
-
-# -------- TABLE --------
-st.subheader("📊 PG Table")
-
-if df.empty:
-    st.warning("No data")
-else:
-    cols = ["pg_id","pg_name","location","food_type","room_type","gender","laundry","rating"]
-    available = [c for c in cols if c in df.columns]
-    st.dataframe(df[available], use_container_width=True)
-
-# -------- ACTIONS --------
-st.subheader("⚙️ Actions")
-
-if not df.empty:
-    selected = st.selectbox("Select PG", df.index)
-
-    col1, col2 = st.columns(2)
-
-    if col1.button("🗑 Delete"):
-        sheet.delete_rows(selected+2)
-        st.rerun()
-
-    if col2.button("✏️ Edit"):
-        st.session_state.edit_index = selected
-
-# -------- EDIT --------
-if "edit_index" in st.session_state:
-
-    i = st.session_state.edit_index
-    row = df.loc[i]
-
-    st.subheader("✏️ Edit PG")
-
-    new_name = st.text_input("PG Name", row.get("pg_name",""))
-    new_location = st.text_input("Location", row.get("location",""))
-    new_owner = st.text_input("Owner Name", row.get("owner_name",""))
-    new_number = st.text_input("Owner Number", row.get("owner_number",""))
-
-    new_food = st.selectbox("Food", ["Veg","Non-Veg","Mixed"])
-    new_laundry = st.selectbox("Laundry", ["Yes","No"])
-    new_room = st.selectbox("Room Type", ["AC","Non AC","Mixed"])
-
-    existing_gender = row.get("gender","Male")
-    if existing_gender not in ["Male","Female"]:
-        existing_gender = "Male"
-
-    new_gender = st.selectbox("Gender", ["Male","Female"],
-        index=["Male","Female"].index(existing_gender)
-    )
-
-    new_metro = st.number_input("Metro", int(row.get("metro (m)",0)))
-    new_bus = st.number_input("Bus", int(row.get("bus (m)",0)))
-    new_rail = st.number_input("Rail", int(row.get("rail (m)",0)))
-
-    new_near = st.text_input("Nearby", row.get("nearby places",""))
-
-    new_clean = st.slider("Clean", 1, 10, int(row.get("clean",1)))
-    new_food_rating = st.slider("Food Rating", 1, 10, int(row.get("food",1)))
-    new_safety = st.slider("Safety", 1, 10, int(row.get("safety",1)))
-    new_value = st.slider("Value", 1, 10, int(row.get("value",1)))
-    new_crowd = st.slider("Crowd", 1, 10, int(row.get("crowd",1)))
-
-    new_notes = st.text_area("Notes", row.get("notes",""))
-
-    if st.button("💾 Update"):
-
-        rating = round((new_clean+new_food_rating+new_safety+new_value+new_crowd)/5,1)
-
-        sheet.update(f"A{i+2}:V{i+2}", [[
-            row["pg_id"], new_name, new_location,
-            new_owner, new_number,
-            row.get("sharing_json",""),
-            new_food, new_laundry,
-            new_room, new_gender,
-            new_metro, new_bus, new_rail,
-            new_near,
-            new_clean, new_food_rating, new_safety,
-            new_value, new_crowd,
-            rating, new_notes,
-            row.get("timestamp","")
-        ]])
-
-        st.success("Updated")
-        del st.session_state.edit_index
-        st.rerun()
