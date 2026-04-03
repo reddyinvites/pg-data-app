@@ -18,10 +18,16 @@ def reset_form():
         if k in st.session_state:  
             del st.session_state[k]
 
-# -------- PHONE VALIDATION (NEW ADDED) --------
+# -------- PHONE FORMAT + VALIDATION (NEW) --------
+def auto_format_phone(num):
+    num = str(num).strip().replace(" ", "")
+    if num.startswith("+91"):
+        num = num[3:]
+    num = "".join([c for c in num if c.isdigit()])
+    return "+91" + num[:10]
+
 def valid_phone(num):
-    num = str(num).replace("+91","").strip()
-    return num.isdigit() and len(num) == 10
+    return num.startswith("+91") and len(num) == 13 and num[3:].isdigit()
 
 # -------- LOGIN --------
 if "logged_in" not in st.session_state:
@@ -157,7 +163,17 @@ with st.form("pg_form"):
     name = st.text_input("PG Name", key="name")  
     location = st.text_input("Location", key="location")  
     owner_name = st.text_input("Owner Name", key="owner_name")  
-    owner_number = st.text_input("Owner Number", key="owner_number")  
+
+    # 🔥 AUTO FORMAT INPUT
+    owner_input = st.text_input("Owner Number", key="owner_number")
+    formatted_number = auto_format_phone(owner_input)
+
+    if owner_input:
+        st.info(f"📱 Formatted: {formatted_number}")
+        if valid_phone(formatted_number):
+            st.success("✅ Valid number")
+        else:
+            st.error("❌ Invalid number")
 
     food_type = st.selectbox("Food Type", ["Veg","Non-Veg","Mixed"])  
     laundry = st.selectbox("Laundry", ["Yes","No"])  
@@ -191,9 +207,8 @@ if preview:
 # -------- SAVE --------
 if save:
 
-    # ✅ PHONE VALIDATION ADDED HERE
-    if not valid_phone(owner_number):
-        st.error("❌ Invalid phone number (must be 10 digits)")
+    if not valid_phone(formatted_number):
+        st.error("❌ Enter valid phone number")
         st.stop()
 
     if "preview" not in st.session_state:
@@ -210,7 +225,7 @@ if save:
         "pg_name": name,
         "location": location,
         "owner_name": owner_name,
-        "owner_number": owner_number,
+        "owner_number": formatted_number,
         "sharing_json": json.dumps(st.session_state.sharing_data),
         "food_type": food_type,
         "laundry": laundry,
@@ -236,7 +251,6 @@ if save:
 
     st.success(f"✅ Saved {pg_id}")
 
-    # RESET
     st.session_state.sharing_data = [{
         "type": "2 Sharing",
         "price": 6000,
