@@ -122,9 +122,10 @@ col6, col7 = st.columns(2)
 price = col6.number_input("Price", 0, step=500, key="price")
 deposit = col7.number_input("Deposit", 0, step=500, key="deposit")
 
-# BUTTON
+# BUTTON TEXT
 btn = "💾 Update Room" if st.session_state.edit_index is not None else "➕ Add Room"
 
+# ADD / UPDATE ROOM
 if st.button(btn):
 
     new_data = {
