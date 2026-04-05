@@ -7,18 +7,27 @@ st.set_page_config(page_title="PG Manager", layout="wide")
 
 st.title("🏠 PG Manager - Smart Entry")
 
-# ---------------- GOOGLE SHEETS ----------------
+# ---------------- GOOGLE SHEETS (FIXED) ----------------
 scope = [
-    "https://spreadsheets.google.com/feeds",
+    "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(
-    st.secrets["gcp_service_account"], scope
-)
+try:
+    creds = ServiceAccountCredentials.from_json_keyfile_dict(
+        dict(st.secrets["gcp_service_account"]), scope
+    )
 
-client = gspread.authorize(creds)
-sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
+    client = gspread.authorize(creds)
+
+    sheet = client.open_by_key(
+        "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
+    ).sheet1
+
+except Exception as e:
+    st.error("❌ Google Sheets connection failed")
+    st.write(e)
+    st.stop()
 
 # ---------------- SESSION ----------------
 if "saved_rooms" not in st.session_state:
@@ -46,7 +55,7 @@ def reset_form():
         if k in st.session_state:
             del st.session_state[k]
 
-# INIT
+# INIT DEFAULT VALUES
 if "floor" not in st.session_state:
     st.session_state.floor = 1
     st.session_state.room_no = "101"
