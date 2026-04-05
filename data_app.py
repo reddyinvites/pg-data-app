@@ -80,9 +80,9 @@ def generate_pg_id(df):
     return f"PG{max(nums)+1:03d}" if nums else "PG001"
 
 
-# ---------------- AUTO ROOM GENERATOR ----------------
-def generate_room_number(floor, existing_rooms):
-    floor_rooms = [r for r in existing_rooms if r["floor"] == floor]
+# ---------------- ROOM NUMBER ----------------
+def generate_room_number(floor, rooms):
+    floor_rooms = [r for r in rooms if r["floor"] == floor]
 
     nums = []
     for r in floor_rooms:
@@ -110,81 +110,75 @@ if "rooms" not in st.session_state:
 st.subheader("🛏 Rooms")
 
 for i in range(len(st.session_state.rooms)):
-
     r = st.session_state.rooms[i]
 
-    st.markdown(f"### Room {i+1}")
+    with st.container():
+        st.markdown(f"### Room {i+1}")
+        st.divider()
 
-    col1, col2 = st.columns(2)
+        col1, col2 = st.columns(2)
 
-    floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
+        floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
 
-    room_key = f"room_{i}"
-    last_floor_key = f"last_floor_{i}"
+        room_key = f"room_{i}"
+        last_floor_key = f"last_floor_{i}"
 
-    # INIT
-    if room_key not in st.session_state:
-        st.session_state[room_key] = r["room_no"]
-        st.session_state[last_floor_key] = floor
+        if room_key not in st.session_state:
+            st.session_state[room_key] = r["room_no"]
+            st.session_state[last_floor_key] = floor
 
-    # FLOOR CHANGE → AUTO UPDATE
-    if st.session_state.get(last_floor_key) != floor:
-        new_room = generate_room_number(floor, st.session_state.rooms)
+        if st.session_state.get(last_floor_key) != floor:
+            new_room = generate_room_number(floor, st.session_state.rooms)
 
-        # only auto-update if user didn’t manually change
-        if st.session_state[room_key] == r["room_no"]:
-            st.session_state[room_key] = new_room
+            if st.session_state[room_key] == r["room_no"]:
+                st.session_state[room_key] = new_room
 
-        st.session_state[last_floor_key] = floor
+            st.session_state[last_floor_key] = floor
 
-    room_no = col2.text_input("Room No", key=room_key)
+        room_no = col2.text_input("Room No", key=room_key)
 
-    col3, col4, col5 = st.columns(3)
+        col3, col4, col5 = st.columns(3)
 
-    sharing = col3.selectbox(
-        "Sharing",
-        ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
-        index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(r["sharing"]),
-        key=f"share_{i}"
-    )
+        sharing = col3.selectbox(
+            "Sharing",
+            ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
+            index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(r["sharing"]),
+            key=f"share_{i}"
+        )
 
-    max_beds = int(sharing.split()[0])
+        max_beds = int(sharing.split()[0])
 
-    total_beds = col4.number_input("Beds", 1, max_beds, value=r["total_beds"], key=f"tb_{i}")
-    available_beds = col5.number_input("Available", 0, total_beds, value=r["available_beds"], key=f"ab_{i}")
+        total_beds = col4.number_input("Beds", 1, max_beds, value=r["total_beds"], key=f"tb_{i}")
+        available_beds = col5.number_input("Available", 0, total_beds, value=r["available_beds"], key=f"ab_{i}")
 
-    col6, col7 = st.columns(2)
+        col6, col7 = st.columns(2)
 
-    price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
-    deposit = col7.number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
+        price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
+        deposit = col7.number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
 
-    if st.button("❌ Remove Room", key=f"del_{i}"):
-        if len(st.session_state.rooms) > 1:
-            st.session_state.rooms.pop(i)
-            st.rerun()
+        if st.button("❌ Remove Room", key=f"del_{i}"):
+            if len(st.session_state.rooms) > 1:
+                st.session_state.rooms.pop(i)
+                st.rerun()
 
-    # UPDATE STATE
-    st.session_state.rooms[i] = {
-        "floor": floor,
-        "room_no": st.session_state[room_key],
-        "sharing": sharing,
-        "total_beds": total_beds,
-        "available_beds": available_beds,
-        "price": price,
-        "deposit": deposit
-    }
+        st.session_state.rooms[i] = {
+            "floor": floor,
+            "room_no": st.session_state[room_key],
+            "sharing": sharing,
+            "total_beds": total_beds,
+            "available_beds": available_beds,
+            "price": price,
+            "deposit": deposit
+        }
 
-
-# ---------------- ADD ROOM ----------------
+# ADD ROOM
 if st.button("➕ Add Room"):
-    floors = [r["floor"] for r in st.session_state.rooms]
-    last_floor = floors[-1]
-
-    new_room_no = generate_room_number(last_floor, st.session_state.rooms)
+    last_floor = st.session_state.rooms[-1]["floor"]
+    new_room = generate_room_number(last_floor, st.session_state.rooms)
 
     st.session_state.rooms.append({
         "floor": last_floor,
-        "room_no": new_room_no,
+        "room_no": new_room,
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
@@ -197,11 +191,11 @@ if st.button("➕ Add Room"):
 # ---------------- SUMMARY ----------------
 st.subheader("📊 Summary")
 
-total_rooms = len(st.session_state.rooms)
-total_beds = sum(r["total_beds"] for r in st.session_state.rooms)
-available = sum(r["available_beds"] for r in st.session_state.rooms)
-
-st.info(f"Rooms: {total_rooms} | Beds: {total_beds} | Available: {available}")
+st.info(
+    f"Rooms: {len(st.session_state.rooms)} | "
+    f"Beds: {sum(r['total_beds'] for r in st.session_state.rooms)} | "
+    f"Available: {sum(r['available_beds'] for r in st.session_state.rooms)}"
+)
 
 
 # ---------------- FORM ----------------
@@ -214,31 +208,24 @@ with st.form("pg_form"):
 
     area = st.selectbox("Area", ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"])
 
-    locality_options = {
-        "Gachibowli": ["Telecom Nagar", "Indira Nagar"],
-        "Kondapur": ["Raghavendra Colony"],
-        "Madhapur": ["Ayyappa Society"],
-        "Hitech City": ["Shilparamam"]
-    }
-
-    locality = st.selectbox("Locality", locality_options.get(area, []) + ["Other"])
-
-    if locality == "Other":
-        locality = st.text_input("Enter Locality")
+    locality = st.text_input("Locality")
 
     location = f"{area} - {locality}"
 
     col3, col4 = st.columns(2)
 
-    gender = col3.selectbox("Gender", ["Male", "Female"])
+    gender = col3.selectbox("Gender", ["Male", "Female", "Co-Living"])
     room_type = col4.selectbox("Room Type", ["AC", "Non AC"])
 
     laundry = st.selectbox("Laundry", ["Yes", "No"])
 
-    preview = st.form_submit_button("👁 Preview")
-    save = st.form_submit_button("💾 Save")
+    st.subheader("🍽 Ratings")
 
-food_type = "Veg"
+    food_rating = st.slider("Food", 0, 10, 7)
+    cleanliness = st.slider("Cleanliness", 0, 10, 7)
+    safety = st.slider("Safety", 0, 10, 8)
+
+    save = st.form_submit_button("💾 Save")
 
 
 # ---------------- SAVE ----------------
@@ -247,15 +234,6 @@ if save:
     if not name or not owner_number:
         st.error("Fill required fields")
         st.stop()
-
-    # DUPLICATE CHECK
-    seen = set()
-    for r in st.session_state.rooms:
-        key = (r["floor"], r["room_no"])
-        if key in seen:
-            st.error("Duplicate room found")
-            st.stop()
-        seen.add(key)
 
     pg_id = generate_pg_id(df)
     headers = sheet.row_values(1)
@@ -274,10 +252,12 @@ if save:
             "available_beds": room["available_beds"],
             "price": room["price"],
             "deposit": room["deposit"],
-            "food_type": food_type,
-            "laundry": laundry,
-            "room_type": room_type,
             "gender": gender,
+            "room_type": room_type,
+            "laundry": laundry,
+            "food_rating": food_rating,
+            "cleanliness": cleanliness,
+            "safety": safety,
             "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         }
 
