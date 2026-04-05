@@ -9,7 +9,7 @@ st.set_page_config(page_title="PG Manager", layout="wide")
 # ---------------- RESET ----------------
 def reset_form():
     for key in list(st.session_state.keys()):
-        if key.startswith(("floor_", "room_", "share_", "tb_", "ab_", "price_", "dep_")):
+        if key.startswith(("floor_", "room_", "share_", "tb_", "ab_", "price_", "dep_", "last_floor_")):
             del st.session_state[key]
 
     for k in ["name", "owner_number"]:
@@ -24,7 +24,6 @@ if "logged_in" not in st.session_state:
 
 def login():
     st.title("🔐 Admin Login")
-
     with st.form("login"):
         u = st.text_input("Username")
         p = st.text_input("Password", type="password")
@@ -54,7 +53,6 @@ sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet
 
 st.title("🏠 PG Manager - Smart Entry")
 
-
 # ---------------- LOAD ----------------
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
@@ -82,11 +80,26 @@ def generate_pg_id(df):
     return f"PG{max(nums)+1:03d}" if nums else "PG001"
 
 
+# ---------------- AUTO ROOM GENERATOR ----------------
+def generate_room_number(floor, existing_rooms):
+    floor_rooms = [r for r in existing_rooms if r["floor"] == floor]
+
+    nums = []
+    for r in floor_rooms:
+        try:
+            nums.append(int(str(r["room_no"])[-2:]))
+        except:
+            pass
+
+    next_num = max(nums) + 1 if nums else 1
+    return f"{floor}{next_num:02d}"
+
+
 # ---------------- ROOMS ----------------
 if "rooms" not in st.session_state:
     st.session_state.rooms = [{
         "floor": 1,
-        "room_no": "",
+        "room_no": "101",
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
@@ -96,9 +109,9 @@ if "rooms" not in st.session_state:
 
 st.subheader("🛏 Rooms")
 
-updated_rooms = []
+for i in range(len(st.session_state.rooms)):
 
-for i, r in enumerate(st.session_state.rooms):
+    r = st.session_state.rooms[i]
 
     st.markdown(f"### Room {i+1}")
 
@@ -106,12 +119,23 @@ for i, r in enumerate(st.session_state.rooms):
 
     floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
 
-    # AUTO ROOM
     room_key = f"room_{i}"
-    auto_room = f"{floor}01"
+    last_floor_key = f"last_floor_{i}"
 
+    # INIT
     if room_key not in st.session_state:
-        st.session_state[room_key] = auto_room
+        st.session_state[room_key] = r["room_no"]
+        st.session_state[last_floor_key] = floor
+
+    # FLOOR CHANGE → AUTO UPDATE
+    if st.session_state.get(last_floor_key) != floor:
+        new_room = generate_room_number(floor, st.session_state.rooms)
+
+        # only auto-update if user didn’t manually change
+        if st.session_state[room_key] == r["room_no"]:
+            st.session_state[room_key] = new_room
+
+        st.session_state[last_floor_key] = floor
 
     room_no = col2.text_input("Room No", key=room_key)
 
@@ -129,9 +153,6 @@ for i, r in enumerate(st.session_state.rooms):
     total_beds = col4.number_input("Beds", 1, max_beds, value=r["total_beds"], key=f"tb_{i}")
     available_beds = col5.number_input("Available", 0, total_beds, value=r["available_beds"], key=f"ab_{i}")
 
-    if available_beds > total_beds:
-        st.warning("⚠ Available beds cannot exceed total beds")
-
     col6, col7 = st.columns(2)
 
     price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
@@ -142,22 +163,28 @@ for i, r in enumerate(st.session_state.rooms):
             st.session_state.rooms.pop(i)
             st.rerun()
 
-    updated_rooms.append({
+    # UPDATE STATE
+    st.session_state.rooms[i] = {
         "floor": floor,
-        "room_no": room_no,
+        "room_no": st.session_state[room_key],
         "sharing": sharing,
         "total_beds": total_beds,
         "available_beds": available_beds,
         "price": price,
         "deposit": deposit
-    })
+    }
 
-st.session_state.rooms = updated_rooms
 
+# ---------------- ADD ROOM ----------------
 if st.button("➕ Add Room"):
+    floors = [r["floor"] for r in st.session_state.rooms]
+    last_floor = floors[-1]
+
+    new_room_no = generate_room_number(last_floor, st.session_state.rooms)
+
     st.session_state.rooms.append({
-        "floor": 1,
-        "room_no": "",
+        "floor": last_floor,
+        "room_no": new_room_no,
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
@@ -188,15 +215,13 @@ with st.form("pg_form"):
     area = st.selectbox("Area", ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"])
 
     locality_options = {
-        "Gachibowli": ["Telecom Nagar", "Indira Nagar", "DLF Area"],
-        "Kondapur": ["Raghavendra Colony", "Botanical Garden"],
+        "Gachibowli": ["Telecom Nagar", "Indira Nagar"],
+        "Kondapur": ["Raghavendra Colony"],
         "Madhapur": ["Ayyappa Society"],
         "Hitech City": ["Shilparamam"]
     }
 
-    locality_list = locality_options.get(area, []) + ["Other"]
-
-    locality = st.selectbox("Locality", locality_list)
+    locality = st.selectbox("Locality", locality_options.get(area, []) + ["Other"])
 
     if locality == "Other":
         locality = st.text_input("Enter Locality")
@@ -216,32 +241,19 @@ with st.form("pg_form"):
 food_type = "Veg"
 
 
-# ---------------- PREVIEW ----------------
-if preview:
-    st.session_state.preview = True
-    st.json({
-        "PG": name,
-        "Location": location,
-        "Rooms": st.session_state.rooms
-    })
-
-
 # ---------------- SAVE ----------------
 if save:
 
-    if "preview" not in st.session_state:
-        st.error("⚠ Click Preview first")
-        st.stop()
-
     if not name or not owner_number:
-        st.error("⚠ Fill required fields")
+        st.error("Fill required fields")
         st.stop()
 
+    # DUPLICATE CHECK
     seen = set()
     for r in st.session_state.rooms:
         key = (r["floor"], r["room_no"])
         if key in seen:
-            st.error("⚠ Duplicate rooms detected")
+            st.error("Duplicate room found")
             st.stop()
         seen.add(key)
 
@@ -249,6 +261,7 @@ if save:
     headers = sheet.row_values(1)
 
     for room in st.session_state.rooms:
+
         row_data = {
             "pg_id": pg_id,
             "pg_name": name,
@@ -273,19 +286,15 @@ if save:
 
     st.success(f"✅ Saved {pg_id}")
 
+    reset_form()
     st.session_state.rooms = [{
         "floor": 1,
-        "room_no": "",
+        "room_no": "101",
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
         "price": 6000,
         "deposit": 2000
     }]
-
-    reset_form()
-
-    if "preview" in st.session_state:
-        del st.session_state.preview
 
     st.rerun()
