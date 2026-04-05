@@ -12,7 +12,7 @@ def reset_form():
         if key.startswith(("floor_", "room_", "share_", "tb_", "ab_", "price_", "dep_")):
             del st.session_state[key]
 
-    for k in ["name", "location", "owner_number"]:
+    for k in ["name", "owner_number"]:
         if k in st.session_state:
             del st.session_state[k]
 
@@ -48,7 +48,7 @@ client = gspread.authorize(creds)
 
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
-st.title("🏠 PG Manager - Quick Entry")
+st.title("🏠 PG Manager - Smart Entry")
 
 # ---------------- LOAD ----------------
 data = sheet.get_all_records()
@@ -96,15 +96,14 @@ for i, r in enumerate(st.session_state.rooms):
 
     floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
 
-    # ✅ AUTO ROOM FIX (SESSION STATE BASED)
+    # AUTO ROOM UPDATE
     room_key = f"room_{i}"
     auto_room = f"{floor}01"
 
     if room_key not in st.session_state:
         st.session_state[room_key] = auto_room
     else:
-        prev_val = st.session_state[room_key]
-        if prev_val.endswith("01"):
+        if st.session_state[room_key].endswith("01"):
             st.session_state[room_key] = auto_room
 
     room_no = col2.text_input("Room No", key=room_key)
@@ -128,7 +127,6 @@ for i, r in enumerate(st.session_state.rooms):
 
     col6, col7 = st.columns(2)
 
-    # ✅ ₹500 STEP
     price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
     deposit = col7.number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
 
@@ -176,22 +174,41 @@ with st.form("pg_form"):
     col1, col2 = st.columns(2)
 
     name = col1.text_input("PG Name", key="name")
-    location = col2.text_input("Location", key="location")
+    owner_number = col2.text_input("Owner Number", key="owner_number")
 
-    owner_number = st.text_input("Owner Number", key="owner_number")
+    # SMART LOCATION
+    area = st.selectbox(
+        "Area",
+        ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"]
+    )
+
+    locality_options = {
+        "Gachibowli": ["Telecom Nagar", "Indira Nagar", "Anjaiah Nagar", "DLF Area", "Financial District"],
+        "Kondapur": ["Raghavendra Colony", "Botanical Garden", "Masjid Banda"],
+        "Madhapur": ["Ayyappa Society", "100ft Road", "Cyber Hills"],
+        "Hitech City": ["Shilparamam", "Mindspace", "Raidurg"]
+    }
+
+    locality_list = locality_options.get(area, []) + ["Other"]
+
+    locality = st.selectbox("Locality / Street", locality_list)
+
+    if locality == "Other":
+        locality = st.text_input("Enter Locality")
+
+    location = f"{area} - {locality}"
 
     col3, col4 = st.columns(2)
 
     gender = col3.selectbox("Gender", ["Male", "Female"])
     room_type = col4.selectbox("Room Type", ["AC", "Non AC"])
 
-    # ✅ Laundry
     laundry = st.selectbox("Laundry", ["Yes", "No"], index=0)
 
     preview = st.form_submit_button("👁 Preview")
     save = st.form_submit_button("💾 Save")
 
-# ---------------- DEFAULT ----------------
+# DEFAULT
 food_type = "Veg"
 
 # ---------------- PREVIEW ----------------
@@ -210,11 +227,10 @@ if save:
         st.error("Click Preview first")
         st.stop()
 
-    if not name or not location or not owner_number:
+    if not name or not owner_number:
         st.error("Fill required fields")
         st.stop()
 
-    # duplicate check
     seen = set()
     for r in st.session_state.rooms:
         key = (r["floor"], r["room_no"])
@@ -255,7 +271,6 @@ if save:
 
     st.success(f"✅ Saved {pg_id}")
 
-    # reset
     st.session_state.rooms = [{
         "floor": 1,
         "room_no": "",
