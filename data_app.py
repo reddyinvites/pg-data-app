@@ -58,7 +58,7 @@ df = pd.DataFrame(data)
 if not df.empty:
     df.columns = df.columns.str.lower().str.strip()
 
-# ---------------- HEADER NORMALIZE ----------------
+# ---------------- HEADER ----------------
 def normalize_header(h):
     return h.lower().strip()
 
@@ -80,7 +80,7 @@ def generate_pg_id(df):
 if "rooms" not in st.session_state:
     st.session_state.rooms = [{
         "floor": 1,
-        "room_no": "101",
+        "room_no": "",
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
@@ -99,7 +99,10 @@ for i, r in enumerate(st.session_state.rooms):
     col1, col2 = st.columns(2)
 
     floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
-    room_no = col2.text_input("Room No", value=r["room_no"], key=f"room_{i}")
+
+    # ✅ Auto room number
+    default_room = f"{floor}01" if r["room_no"] == "" else r["room_no"]
+    room_no = col2.text_input("Room No", value=default_room, key=f"room_{i}")
 
     col3, col4, col5 = st.columns(3)
 
@@ -123,6 +126,10 @@ for i, r in enumerate(st.session_state.rooms):
         value=min(r["available_beds"], total_beds),
         key=f"ab_{i}"
     )
+
+    # ✅ Validation
+    if available_beds > total_beds:
+        st.error(f"❌ Room {room_no}: Available beds can't exceed total beds")
 
     col6, col7 = st.columns(2)
 
@@ -157,6 +164,15 @@ if st.button("➕ Add Room"):
         "deposit": 2000
     })
     st.rerun()
+
+# ---------------- SUMMARY ----------------
+st.subheader("📊 Summary")
+
+total_rooms = len(st.session_state.rooms)
+total_beds = sum(r["total_beds"] for r in st.session_state.rooms)
+available = sum(r["available_beds"] for r in st.session_state.rooms)
+
+st.info(f"Rooms: {total_rooms} | Beds: {total_beds} | Available: {available}")
 
 # ---------------- FORM ----------------
 with st.form("pg_form"):
@@ -207,12 +223,28 @@ if save:
         st.error("Click Preview first")
         st.stop()
 
+    # ✅ Duplicate check
+    rooms_seen = set()
+    for r in st.session_state.rooms:
+        key = (r["floor"], r["room_no"])
+
+        if key in rooms_seen:
+            st.error(f"❌ Duplicate Room Found: Floor {r['floor']} Room {r['room_no']}")
+            st.stop()
+
+        rooms_seen.add(key)
+
     pg_id = generate_pg_id(df)
     rating = round((clean + food_rating + safety + value + crowd) / 5, 1)
 
     headers = sheet.row_values(1)
 
     for room in st.session_state.rooms:
+
+        # ✅ Empty room check
+        if not room["room_no"]:
+            st.error("Room number required")
+            st.stop()
 
         row_data = {
             "pg_id": pg_id,
@@ -258,7 +290,7 @@ if save:
     # RESET
     st.session_state.rooms = [{
         "floor": 1,
-        "room_no": "101",
+        "room_no": "",
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
