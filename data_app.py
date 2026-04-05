@@ -22,32 +22,36 @@ def get_client():
     )
     return gspread.authorize(creds)
 
-client = get_client()
+@st.cache_resource
+def get_sheets():
+    client = get_client()
+    sh = client.open_by_key(SHEET_ID)
+    return sh.sheet1, sh.worksheet("Areas")
 
-# ---------------- CACHE DATA ----------------
+try:
+    sheet, area_sheet = get_sheets()
+except Exception as e:
+    st.error("❌ Sheet connection error")
+    st.write(e)
+    st.stop()
+
+# ---------------- CACHE AREA DATA ----------------
 @st.cache_data(ttl=60)
 def load_area_data():
-    area_sheet = client.open_by_key(SHEET_ID).worksheet("Areas")
     data = area_sheet.get_all_values()
 
     area_locality_map = {}
-
     for row in data:
         if len(row) < 2:
             continue
 
         a, l = row[0].strip(), row[1].strip()
-
         if a and l:
             area_locality_map.setdefault(a, [])
             if l not in area_locality_map[a]:
                 area_locality_map[a].append(l)
 
     return area_locality_map
-
-# ---------------- LOAD ----------------
-sheet = client.open_by_key(SHEET_ID).sheet1
-area_sheet = client.open_by_key(SHEET_ID).worksheet("Areas")
 
 area_locality_map = load_area_data()
 area_list = list(area_locality_map.keys())
@@ -112,7 +116,6 @@ for i, r in enumerate(st.session_state.saved_rooms):
 st.markdown("### ✏️ Room Entry")
 
 c1,c2 = st.columns(2)
-
 floor = c1.number_input("Floor",0,20,key="floor")
 
 if st.session_state.edit_index is None:
@@ -129,7 +132,7 @@ sharing = c3.selectbox(
     key="sharing"
 )
 
-# ✅ FIXED BEDS LOGIC
+# FIX BEDS
 if st.session_state.total_beds > sharing:
     st.session_state.total_beds = sharing
 
@@ -140,7 +143,7 @@ total_beds = c4.number_input(
     key="total_beds"
 )
 
-# ✅ FIXED AVAILABLE LOGIC
+# FIX AVAILABLE
 if st.session_state.available_beds > total_beds:
     st.session_state.available_beds = total_beds
 
@@ -152,7 +155,6 @@ available_beds = c5.number_input(
 )
 
 c6,c7 = st.columns(2)
-
 price = c6.number_input("Price",0,step=500,key="price")
 deposit = c7.number_input("Deposit",0,step=500,key="deposit")
 
