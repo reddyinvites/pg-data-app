@@ -46,20 +46,11 @@ def load_area_data():
     return area_locality_map
 
 # ---------------- LOAD ----------------
-try:
-    sheet = client.open_by_key(SHEET_ID).sheet1
-    area_sheet = client.open_by_key(SHEET_ID).worksheet("Areas")
+sheet = client.open_by_key(SHEET_ID).sheet1
+area_sheet = client.open_by_key(SHEET_ID).worksheet("Areas")
 
-    area_locality_map = load_area_data()
-    area_list = list(area_locality_map.keys())
-
-    if not area_list:
-        raise Exception("Empty")
-
-except Exception as e:
-    st.error("⚠️ Sheet connection issue")
-    st.write(e)
-    st.stop()
+area_locality_map = load_area_data()
+area_list = list(area_locality_map.keys())
 
 # ---------------- SESSION ----------------
 if "saved_rooms" not in st.session_state:
@@ -86,11 +77,16 @@ def reset_form():
         if k in st.session_state:
             del st.session_state[k]
 
-# INIT DEFAULT
+# DEFAULTS
 if "floor" not in st.session_state:
     st.session_state.update({
-        "floor":1,"room_no":"101","sharing":"2",
-        "total_beds":2,"available_beds":1,"price":6000,"deposit":2000
+        "floor":1,
+        "room_no":"101",
+        "sharing":2,
+        "total_beds":1,
+        "available_beds":0,
+        "price":6000,
+        "deposit":2000
     })
 
 # ---------------- ROOMS ----------------
@@ -103,9 +99,9 @@ for i, r in enumerate(st.session_state.saved_rooms):
     c3.write(f"₹{r['price']}")
 
     if c4.button("✏️", key=f"edit{i}"):
-        st.session_state.edit_index=i
+        st.session_state.edit_index = i
         for k in r:
-            st.session_state[k]=r[k]
+            st.session_state[k] = r[k]
         st.rerun()
 
     if c5.button("❌", key=f"del{i}"):
@@ -116,6 +112,7 @@ for i, r in enumerate(st.session_state.saved_rooms):
 st.markdown("### ✏️ Room Entry")
 
 c1,c2 = st.columns(2)
+
 floor = c1.number_input("Floor",0,20,key="floor")
 
 if st.session_state.edit_index is None:
@@ -124,28 +121,59 @@ if st.session_state.edit_index is None:
 room_no = c2.text_input("Room No",key="room_no")
 
 c3,c4,c5 = st.columns(3)
-sharing = c3.selectbox("Sharing",[1,2,3,4],format_func=lambda x: f"{x} Sharing",key="sharing")
 
-total_beds = c4.number_input("Beds",1,sharing,key="total_beds")
-available_beds = c5.number_input("Available",0,total_beds,key="available_beds")
+sharing = c3.selectbox(
+    "Sharing",
+    [1,2,3,4],
+    format_func=lambda x: f"{x} Sharing",
+    key="sharing"
+)
+
+# ✅ FIXED BEDS LOGIC
+if st.session_state.total_beds > sharing:
+    st.session_state.total_beds = sharing
+
+total_beds = c4.number_input(
+    "Beds",
+    min_value=1,
+    max_value=sharing,
+    key="total_beds"
+)
+
+# ✅ FIXED AVAILABLE LOGIC
+if st.session_state.available_beds > total_beds:
+    st.session_state.available_beds = total_beds
+
+available_beds = c5.number_input(
+    "Available",
+    min_value=0,
+    max_value=total_beds,
+    key="available_beds"
+)
 
 c6,c7 = st.columns(2)
+
 price = c6.number_input("Price",0,step=500,key="price")
 deposit = c7.number_input("Deposit",0,step=500,key="deposit")
 
 if st.button("💾 Save Room"):
-    data={
-        "floor":floor,"room_no":room_no,"sharing":sharing,
-        "total_beds":total_beds,"available_beds":available_beds,
-        "price":price,"deposit":deposit
+
+    data = {
+        "floor":floor,
+        "room_no":room_no,
+        "sharing":sharing,
+        "total_beds":total_beds,
+        "available_beds":available_beds,
+        "price":price,
+        "deposit":deposit
     }
 
     if st.session_state.edit_index is not None:
-        st.session_state.saved_rooms[st.session_state.edit_index]=data
+        st.session_state.saved_rooms[st.session_state.edit_index] = data
     else:
         st.session_state.saved_rooms.append(data)
 
-    st.session_state.edit_index=None
+    st.session_state.edit_index = None
     reset_form()
     st.rerun()
 
@@ -252,6 +280,6 @@ if st.button("🚀 Final Save"):
             sheet.append_row([row.get(h.lower(),"") for h in headers])
 
         st.success("✅ Saved Successfully!")
-        st.session_state.saved_rooms=[]
+        st.session_state.saved_rooms = []
         reset_form()
         st.rerun()
