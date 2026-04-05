@@ -36,8 +36,7 @@ if "current_room" not in st.session_state:
 if "edit_index" not in st.session_state:
     st.session_state.edit_index = None
 
-
-# ---------------- SAFETY CHECK ----------------
+# SAFETY
 if st.session_state.edit_index is not None and \
    st.session_state.edit_index >= len(st.session_state.saved_rooms):
     st.session_state.edit_index = None
@@ -74,8 +73,19 @@ if st.session_state.saved_rooms:
 
         # EDIT
         if col4.button("✏️", key=f"edit_{i}"):
+
             st.session_state.current_room = r.copy()
             st.session_state.edit_index = i
+
+            # Sync form inputs
+            st.session_state.floor_input = r["floor"]
+            st.session_state.room_input = r["room_no"]
+            st.session_state.sharing_input = r["sharing"]
+            st.session_state.beds_input = r["total_beds"]
+            st.session_state.avail_input = r["available_beds"]
+            st.session_state.price_input = r["price"]
+            st.session_state.dep_input = r["deposit"]
+
             st.rerun()
 
         # DELETE
@@ -83,7 +93,6 @@ if st.session_state.saved_rooms:
 
             st.session_state.saved_rooms.pop(i)
 
-            # FIX INDEX SHIFT
             if st.session_state.edit_index == i:
                 st.session_state.edit_index = None
             elif st.session_state.edit_index is not None and st.session_state.edit_index > i:
@@ -92,14 +101,14 @@ if st.session_state.saved_rooms:
             st.rerun()
 
 
-# LABEL
+# MODE LABEL
 if st.session_state.edit_index is not None:
     st.warning("✏️ Editing Room")
 else:
-    st.info("➕ Add New Room")
+    st.success("➕ Add New Room")
 
 
-# FORM
+# ---------------- FORM ----------------
 st.markdown("### ✏️ Room Entry")
 
 r = st.session_state.current_room
@@ -129,8 +138,12 @@ price = col6.number_input("Price", 0, step=500, value=r["price"], key="price_inp
 deposit = col7.number_input("Deposit", 0, step=500, value=r["deposit"], key="dep_input")
 
 
-# ADD / UPDATE ROOM
-if st.button("➕ Add Room"):
+# BUTTON TEXT
+btn_label = "💾 Update Room" if st.session_state.edit_index is not None else "➕ Add Room"
+
+
+# ADD / UPDATE
+if st.button(btn_label):
 
     new_data = {
         "floor": floor,
@@ -142,21 +155,21 @@ if st.button("➕ Add Room"):
         "deposit": deposit
     }
 
-    # SAFE EDIT
     if st.session_state.edit_index is not None and \
        st.session_state.edit_index < len(st.session_state.saved_rooms):
 
         st.session_state.saved_rooms[st.session_state.edit_index] = new_data
+        next_room = room_no
 
     else:
         st.session_state.saved_rooms.append(new_data)
+        next_room = next_room_number(floor)
 
-    # RESET
     st.session_state.edit_index = None
 
     st.session_state.current_room = {
         "floor": floor,
-        "room_no": next_room_number(floor),
+        "room_no": next_room,
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
