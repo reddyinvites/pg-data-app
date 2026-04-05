@@ -36,18 +36,17 @@ def next_room_number(floor):
                 nums.append(int(str(r["room_no"])[-2:]))
             except:
                 pass
-
     next_num = max(nums) + 1 if nums else 1
     return f"{floor}{next_num:02d}"
 
-# ---------------- SAFE RESET ----------------
+# ---------------- RESET ----------------
 def reset_form():
     keys = ["floor","room_no","sharing","total_beds","available_beds","price","deposit"]
     for k in keys:
         if k in st.session_state:
             del st.session_state[k]
 
-# INIT DEFAULT VALUES
+# INIT
 if "floor" not in st.session_state:
     st.session_state.floor = 1
     st.session_state.room_no = "101"
@@ -74,7 +73,6 @@ if st.session_state.saved_rooms:
         # EDIT
         if col4.button("✏️", key=f"edit_{i}"):
             st.session_state.edit_index = i
-
             st.session_state.floor = r["floor"]
             st.session_state.room_no = r["room_no"]
             st.session_state.sharing = r["sharing"]
@@ -82,23 +80,18 @@ if st.session_state.saved_rooms:
             st.session_state.available_beds = r["available_beds"]
             st.session_state.price = r["price"]
             st.session_state.deposit = r["deposit"]
-
             st.rerun()
 
         # DELETE
         if col5.button("❌", key=f"del_{i}"):
             st.session_state.saved_rooms.pop(i)
-
             if st.session_state.edit_index == i:
                 st.session_state.edit_index = None
-
             st.rerun()
 
-# MODE
+# MODE (clean)
 if st.session_state.edit_index is not None:
     st.warning("✏️ Editing Room")
-else:
-    st.success("➕ Add New Room")
 
 # ---------------- FORM ----------------
 st.markdown("### ✏️ Room Entry")
@@ -107,7 +100,7 @@ col1, col2 = st.columns(2)
 
 floor = col1.number_input("Floor", 0, 20, key="floor")
 
-# AUTO ROOM NUMBER (only when not editing)
+# AUTO ROOM NUMBER
 if st.session_state.edit_index is None:
     st.session_state.room_no = next_room_number(floor)
 
@@ -152,7 +145,6 @@ if st.button(btn):
         st.session_state.saved_rooms.append(new_data)
 
     st.session_state.edit_index = None
-
     reset_form()
     st.rerun()
 
@@ -227,6 +219,5 @@ if st.button("🚀 Final Save"):
 
         st.session_state.saved_rooms = []
         st.session_state.edit_index = None
-
         reset_form()
         st.rerun()
