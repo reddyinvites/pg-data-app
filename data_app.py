@@ -28,24 +28,41 @@ def get_sheets():
     sh = client.open_by_key(SHEET_ID)
     return sh.sheet1, sh.worksheet("Areas")
 
-try:
-    sheet, area_sheet = get_sheets()
-except Exception as e:
-    st.error("❌ Sheet connection error")
-    st.write(e)
-    st.stop()
+sheet, area_sheet = get_sheets()
+
+# ---------------- PG ID GENERATOR ----------------
+def generate_pg_id(sheet):
+    try:
+        col = sheet.col_values(1)
+        ids = [c for c in col if str(c).startswith("PG")]
+
+        if not ids:
+            return "PG0001"
+
+        nums = []
+        for i in ids:
+            try:
+                nums.append(int(i.replace("PG","")))
+            except:
+                pass
+
+        next_id = max(nums) + 1
+        return f"PG{next_id:04d}"
+
+    except:
+        return "PG0001"
 
 # ---------------- CACHE AREA DATA ----------------
 @st.cache_data(ttl=60)
 def load_area_data():
     data = area_sheet.get_all_values()
-
     area_locality_map = {}
+
     for row in data:
         if len(row) < 2:
             continue
-
         a, l = row[0].strip(), row[1].strip()
+
         if a and l:
             area_locality_map.setdefault(a, [])
             if l not in area_locality_map[a]:
@@ -132,27 +149,15 @@ sharing = c3.selectbox(
     key="sharing"
 )
 
-# FIX BEDS
 if st.session_state.total_beds > sharing:
     st.session_state.total_beds = sharing
 
-total_beds = c4.number_input(
-    "Beds",
-    min_value=1,
-    max_value=sharing,
-    key="total_beds"
-)
+total_beds = c4.number_input("Beds",1,sharing,key="total_beds")
 
-# FIX AVAILABLE
 if st.session_state.available_beds > total_beds:
     st.session_state.available_beds = total_beds
 
-available_beds = c5.number_input(
-    "Available",
-    min_value=0,
-    max_value=total_beds,
-    key="available_beds"
-)
+available_beds = c5.number_input("Available",0,total_beds,key="available_beds")
 
 c6,c7 = st.columns(2)
 price = c6.number_input("Price",0,step=500,key="price")
@@ -188,62 +193,15 @@ c1,c2 = st.columns(2)
 pg_name = c1.text_input("PG Name")
 owner = c2.text_input("Owner Number")
 
-area = st.selectbox("Area", area_list, key="area")
-localities = area_locality_map.get(area, [])
-locality = st.selectbox("Locality", localities, key="locality")
+area = st.selectbox("Area", area_list)
+locality = st.selectbox("Locality", area_locality_map.get(area, []))
 
-# ➕ ADD
-with st.expander("➕ Add New Locality"):
-    na = st.text_input("Area", key="na")
-    nl = st.text_input("Locality", key="nl")
-
-    if st.button("Add Locality"):
-        if not na or not nl:
-            st.error("Enter both fields")
-        elif nl in area_locality_map.get(na, []):
-            st.warning("Already exists")
-        else:
-            area_sheet.append_row([na, nl])
-            load_area_data.clear()
-            st.success("Added!")
-            st.rerun()
-
-# ✏️ EDIT / DELETE
-with st.expander("✏️ Manage Localities"):
-    ma = st.selectbox("Area", area_list, key="ma")
-    locs = area_locality_map.get(ma, [])
-
-    if locs:
-        ml = st.selectbox("Locality", locs, key="ml")
-        new = st.text_input("Edit", value=ml)
-
-        cA,cB = st.columns(2)
-
-        if cA.button("Update"):
-            rows = area_sheet.get_all_values()
-            for i,r in enumerate(rows,1):
-                if len(r)>=2 and r[0]==ma and r[1]==ml:
-                    area_sheet.update_cell(i,2,new)
-                    break
-            load_area_data.clear()
-            st.success("Updated")
-            st.rerun()
-
-        if cB.button("Delete"):
-            rows = area_sheet.get_all_values()
-            for i,r in enumerate(rows,1):
-                if len(r)>=2 and r[0]==ma and r[1]==ml:
-                    area_sheet.delete_rows(i)
-                    break
-            load_area_data.clear()
-            st.success("Deleted")
-            st.rerun()
-
-# ---------------- EXTRA ----------------
-c3,c4 = st.columns(2)
-gender = c3.selectbox("Gender",["Male","Female","Co-Living"])
-room_type = c4.selectbox("Room Type",["AC","Non AC"])
+gender = st.selectbox("Gender",["Male","Female","Co-Living"])
+room_type = st.selectbox("Room Type",["AC","Non AC"])
 laundry = st.selectbox("Laundry",["Yes","No"])
+
+# ✅ NEW FOOD TYPE
+food_type = st.selectbox("Food Type", ["Veg", "Non Veg", "Both"])
 
 st.subheader("⭐ Ratings")
 food = st.slider("Food",0,10,7)
@@ -258,8 +216,11 @@ if st.button("🚀 Final Save"):
     else:
         headers = sheet.row_values(1)
 
+        pg_id = generate_pg_id(sheet)   # ✅ AUTO ID
+
         for r in st.session_state.saved_rooms:
             row = {
+                "pg_id": pg_id,
                 "pg_name":pg_name,
                 "location":f"{area}-{locality}",
                 "owner_number":owner,
@@ -273,6 +234,7 @@ if st.button("🚀 Final Save"):
                 "gender":gender,
                 "room_type":room_type,
                 "laundry":laundry,
+                "food_type":food_type,   # ✅ SAVED
                 "food_rating":food,
                 "cleanliness":clean,
                 "safety":safety,
