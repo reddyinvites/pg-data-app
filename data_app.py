@@ -26,20 +26,33 @@ except Exception as e:
     st.write(e)
     st.stop()
 
-# ---------------- LOAD AREA DATA ----------------
-data = area_sheet.get_all_values()
-area_locality_map = {}
+# ---------------- SAFE LOAD AREA ----------------
+try:
+    data = area_sheet.get_all_values()
 
-for row in data:
-    if len(row) < 2:
-        continue
-    a, l = row[0].strip(), row[1].strip()
-    if a and l:
-        area_locality_map.setdefault(a, [])
-        if l not in area_locality_map[a]:
-            area_locality_map[a].append(l)
+    area_locality_map = {}
 
-area_list = list(area_locality_map.keys())
+    for row in data:
+        if len(row) < 2:
+            continue
+
+        a = row[0].strip()
+        l = row[1].strip()
+
+        if a and l:
+            area_locality_map.setdefault(a, [])
+            if l not in area_locality_map[a]:
+                area_locality_map[a].append(l)
+
+    area_list = list(area_locality_map.keys())
+
+    if not area_list:
+        raise Exception("Empty Area List")
+
+except Exception as e:
+    st.warning("⚠️ Using fallback areas (check sheet sharing)")
+    area_list = ["Gachibowli"]
+    area_locality_map = {"Gachibowli": ["DLF"]}
 
 # ---------------- SESSION ----------------
 if "saved_rooms" not in st.session_state:
@@ -66,7 +79,7 @@ def reset_form():
         if k in st.session_state:
             del st.session_state[k]
 
-# INIT DEFAULTS
+# INIT DEFAULT
 if "floor" not in st.session_state:
     st.session_state.update({
         "floor":1,"room_no":"101","sharing":"2 Sharing",
@@ -76,26 +89,26 @@ if "floor" not in st.session_state:
 # ---------------- ROOMS ----------------
 st.subheader("🛏 Rooms")
 
-if st.session_state.saved_rooms:
-    for i, r in enumerate(st.session_state.saved_rooms):
-        c1,c2,c3,c4,c5 = st.columns([2,2,2,1,1])
-        c1.write(f"Room {r['room_no']}")
-        c2.write(r["sharing"])
-        c3.write(f"₹{r['price']}")
+for i, r in enumerate(st.session_state.saved_rooms):
+    c1,c2,c3,c4,c5 = st.columns([2,2,2,1,1])
+    c1.write(f"Room {r['room_no']}")
+    c2.write(r["sharing"])
+    c3.write(f"₹{r['price']}")
 
-        if c4.button("✏️", key=f"e{i}"):
-            st.session_state.edit_index=i
-            for k in r: st.session_state[k]=r[k]
-            st.rerun()
+    if c4.button("✏️", key=f"edit{i}"):
+        st.session_state.edit_index=i
+        for k in r:
+            st.session_state[k]=r[k]
+        st.rerun()
 
-        if c5.button("❌", key=f"d{i}"):
-            st.session_state.saved_rooms.pop(i)
-            st.rerun()
+    if c5.button("❌", key=f"del{i}"):
+        st.session_state.saved_rooms.pop(i)
+        st.rerun()
 
-# ---------------- FORM ----------------
+# ---------------- ROOM FORM ----------------
 st.markdown("### ✏️ Room Entry")
-c1,c2 = st.columns(2)
 
+c1,c2 = st.columns(2)
 floor = c1.number_input("Floor",0,20,key="floor")
 
 if st.session_state.edit_index is None:
@@ -104,19 +117,19 @@ if st.session_state.edit_index is None:
 room_no = c2.text_input("Room No",key="room_no")
 
 c3,c4,c5 = st.columns(3)
-sharing = c3.selectbox("Sharing",["1 Sharing","2 Sharing","3 Sharing","4 Sharing"],key="sharing")
+sharing = c3.selectbox("Sharing",["1","2","3","4"],format_func=lambda x: f"{x} Sharing",key="sharing")
+max_beds = int(sharing)
 
-max_beds=int(sharing.split()[0])
-total_beds=c4.number_input("Beds",1,max_beds,key="total_beds")
-available_beds=c5.number_input("Available",0,total_beds,key="available_beds")
+total_beds = c4.number_input("Beds",1,max_beds,key="total_beds")
+available_beds = c5.number_input("Available",0,total_beds,key="available_beds")
 
 c6,c7 = st.columns(2)
-price=c6.number_input("Price",0,step=500,key="price")
-deposit=c7.number_input("Deposit",0,step=500,key="deposit")
+price = c6.number_input("Price",0,step=500,key="price")
+deposit = c7.number_input("Deposit",0,step=500,key="deposit")
 
 if st.button("💾 Save Room"):
     data={
-        "floor":floor,"room_no":room_no,"sharing":sharing,
+        "floor":floor,"room_no":room_no,"sharing":f"{sharing} Sharing",
         "total_beds":total_beds,"available_beds":available_beds,
         "price":price,"deposit":deposit
     }
@@ -136,98 +149,109 @@ st.markdown("---")
 st.subheader("🏢 PG Details")
 
 c1,c2 = st.columns(2)
-pg_name=c1.text_input("PG Name")
-owner=c2.text_input("Owner Number")
+pg_name = c1.text_input("PG Name")
+owner = c2.text_input("Owner Number")
 
 # DROPDOWN
 area = st.selectbox("Area", area_list, key="area")
 localities = area_locality_map.get(area, [])
 locality = st.selectbox("Locality", localities, key="locality")
 
-# ➕ ADD
+# ➕ ADD LOCALITY
 with st.expander("➕ Add New Locality"):
-    na=st.text_input("Area",key="na")
-    nl=st.text_input("Locality",key="nl")
+    na = st.text_input("Area", key="na")
+    nl = st.text_input("Locality", key="nl")
 
-    if st.button("Add"):
-        if nl in area_locality_map.get(na,[]):
-            st.warning("Exists!")
+    if st.button("Add Locality"):
+        if not na or not nl:
+            st.error("Enter both")
+        elif nl in area_locality_map.get(na, []):
+            st.warning("Already exists")
         else:
-            area_sheet.append_row([na,nl])
-            area_locality_map.setdefault(na,[]).append(nl)
-            if na not in area_list: area_list.append(na)
-            st.session_state.area=na
-            st.session_state.locality=nl
+            area_sheet.append_row([na, nl])
+            area_locality_map.setdefault(na, []).append(nl)
+            if na not in area_list:
+                area_list.append(na)
+
+            st.session_state.area = na
+            st.session_state.locality = nl
+            st.success("Added!")
             st.rerun()
 
-# ✏️ DELETE
+# ✏️ EDIT / DELETE
 with st.expander("✏️ Manage Localities"):
-    a=st.selectbox("Area",area_list,key="ma")
-    locs=area_locality_map.get(a,[])
+    ma = st.selectbox("Area", area_list, key="ma")
+    locs = area_locality_map.get(ma, [])
 
     if locs:
-        l=st.selectbox("Locality",locs,key="ml")
-        new=st.text_input("Edit",value=l)
+        ml = st.selectbox("Locality", locs, key="ml")
+        new = st.text_input("Edit", value=ml)
 
-        cA,cB=st.columns(2)
+        cA,cB = st.columns(2)
 
         if cA.button("Update"):
-            rows=area_sheet.get_all_values()
+            rows = area_sheet.get_all_values()
             for i,r in enumerate(rows,1):
-                if len(r)>=2 and r[0]==a and r[1]==l:
+                if len(r)>=2 and r[0]==ma and r[1]==ml:
                     area_sheet.update_cell(i,2,new)
                     break
-            area_locality_map[a][area_locality_map[a].index(l)]=new
+            area_locality_map[ma][area_locality_map[ma].index(ml)] = new
+            st.success("Updated")
             st.rerun()
 
         if cB.button("Delete"):
-            rows=area_sheet.get_all_values()
+            rows = area_sheet.get_all_values()
             for i,r in enumerate(rows,1):
-                if len(r)>=2 and r[0]==a and r[1]==l:
+                if len(r)>=2 and r[0]==ma and r[1]==ml:
                     area_sheet.delete_rows(i)
                     break
-            area_locality_map[a].remove(l)
+            area_locality_map[ma].remove(ml)
+            st.success("Deleted")
             st.rerun()
 
 # ---------------- EXTRA ----------------
 c3,c4 = st.columns(2)
-gender=c3.selectbox("Gender",["Male","Female","Co-Living"])
-room_type=c4.selectbox("Room Type",["AC","Non AC"])
-laundry=st.selectbox("Laundry",["Yes","No"])
+gender = c3.selectbox("Gender",["Male","Female","Co-Living"])
+room_type = c4.selectbox("Room Type",["AC","Non AC"])
+laundry = st.selectbox("Laundry",["Yes","No"])
 
 st.subheader("⭐ Ratings")
-food=st.slider("Food",0,10,7)
-clean=st.slider("Clean",0,10,7)
-safety=st.slider("Safety",0,10,8)
+food = st.slider("Food",0,10,7)
+clean = st.slider("Cleanliness",0,10,7)
+safety = st.slider("Safety",0,10,8)
 
-# ---------------- SAVE ----------------
+# ---------------- FINAL SAVE ----------------
 if st.button("🚀 Final Save"):
-    headers=sheet.row_values(1)
 
-    for r in st.session_state.saved_rooms:
-        row={
-            "pg_name":pg_name,
-            "location":f"{area}-{locality}",
-            "owner_number":owner,
-            "floor":r["floor"],
-            "room_no":r["room_no"],
-            "sharing_type":r["sharing"],
-            "total_beds":r["total_beds"],
-            "available_beds":r["available_beds"],
-            "price":r["price"],
-            "deposit":r["deposit"],
-            "gender":gender,
-            "room_type":room_type,
-            "laundry":laundry,
-            "food_rating":food,
-            "cleanliness":clean,
-            "safety":safety,
-            "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+    if not pg_name or not owner:
+        st.error("Fill required fields")
+    else:
+        headers = sheet.row_values(1)
 
-        sheet.append_row([row.get(h.lower(),"") for h in headers])
+        for r in st.session_state.saved_rooms:
+            row = {
+                "pg_name":pg_name,
+                "location":f"{area}-{locality}",
+                "owner_number":owner,
+                "floor":r["floor"],
+                "room_no":r["room_no"],
+                "sharing_type":r["sharing"],
+                "total_beds":r["total_beds"],
+                "available_beds":r["available_beds"],
+                "price":r["price"],
+                "deposit":r["deposit"],
+                "gender":gender,
+                "room_type":room_type,
+                "laundry":laundry,
+                "food_rating":food,
+                "cleanliness":clean,
+                "safety":safety,
+                "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
 
-    st.success("✅ Saved!")
-    st.session_state.saved_rooms=[]
-    reset_form()
-    st.rerun()
+            sheet.append_row([row.get(h.lower(),"") for h in headers])
+
+        st.success("✅ Saved Successfully!")
+        st.session_state.saved_rooms = []
+        reset_form()
+        st.rerun()
