@@ -3,18 +3,17 @@ import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import json
 
 st.set_page_config(page_title="PG Manager", layout="wide")
 
-# ---------------- RESET FORM ----------------
+# ---------------- RESET ----------------
 def reset_form():
     for key in list(st.session_state.keys()):
-        if key.startswith(("type_", "price_", "dep_", "tb_", "ab_")):
+        if key.startswith(("floor_", "room_", "share_", "tb_", "ab_", "price_", "dep_")):
             del st.session_state[key]
 
-    keys_to_clear = ["name", "location", "owner_name", "owner_number", "nearby_places", "notes"]
-    for k in keys_to_clear:
+    keys = ["name", "location", "owner_name", "owner_number", "nearby_places", "notes"]
+    for k in keys:
         if k in st.session_state:
             del st.session_state[k]
 
@@ -59,18 +58,9 @@ df = pd.DataFrame(data)
 if not df.empty:
     df.columns = df.columns.str.lower().str.strip()
 
-# ---------------- HEADER FIX ----------------
+# ---------------- HEADER NORMALIZE ----------------
 def normalize_header(h):
-    h = h.lower().strip()
-    mapping = {
-        "metro_dist": "metro (m)",
-        "bus_dist": "bus (m)",
-        "rail_dist": "rail (m)",
-        "nearby_places": "nearby places",
-        "cleanliness": "clean",
-        "food_rating": "food"
-    }
-    return mapping.get(h, h)
+    return h.lower().strip()
 
 # ---------------- PG ID ----------------
 def generate_pg_id(df):
@@ -86,63 +76,85 @@ def generate_pg_id(df):
 
     return f"PG{max(nums)+1:03d}" if nums else "PG001"
 
-# ---------------- SHARING ----------------
-if "sharing_data" not in st.session_state:
-    st.session_state.sharing_data = [{
-        "type": "2 Sharing",
-        "price": 6000,
-        "deposit": 2000,
+# ---------------- ROOMS ----------------
+if "rooms" not in st.session_state:
+    st.session_state.rooms = [{
+        "floor": 1,
+        "room_no": "101",
+        "sharing": "2 Sharing",
         "total_beds": 2,
-        "available_beds": 1
+        "available_beds": 1,
+        "price": 6000,
+        "deposit": 2000
     }]
 
-st.subheader("🛏 Sharing")
+st.subheader("🏢 Floors & Rooms")
 
-updated = []
+updated_rooms = []
 
-for i, s in enumerate(st.session_state.sharing_data):
+for i, r in enumerate(st.session_state.rooms):
 
-    col1, col2, col3 = st.columns(3)
+    st.markdown(f"### 🛏 Room {i+1}")
 
-    share_type = col1.selectbox(
-        "Type",
+    col1, col2 = st.columns(2)
+
+    floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
+    room_no = col2.text_input("Room No", value=r["room_no"], key=f"room_{i}")
+
+    col3, col4, col5 = st.columns(3)
+
+    sharing = col3.selectbox(
+        "Sharing",
         ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
-        index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(s["type"]),
-        key=f"type_{i}"
+        index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(r["sharing"]),
+        key=f"share_{i}"
     )
 
-    max_beds = int(share_type.split()[0])
+    max_beds = int(sharing.split()[0])
 
-    price = col2.number_input("Price", value=s["price"], key=f"price_{i}")
-    deposit = col3.number_input("Deposit", value=s["deposit"], key=f"dep_{i}")
+    total_beds = col4.number_input(
+        "Total Beds", 1, max_beds,
+        value=min(r["total_beds"], max_beds),
+        key=f"tb_{i}"
+    )
 
-    col4, col5, col6 = st.columns(3)
+    available_beds = col5.number_input(
+        "Available Beds", 0, total_beds,
+        value=min(r["available_beds"], total_beds),
+        key=f"ab_{i}"
+    )
 
-    total_beds = col4.number_input("Total Beds", 1, max_beds, value=min(s["total_beds"], max_beds), key=f"tb_{i}")
-    available_beds = col5.number_input("Available Beds", 0, total_beds, value=min(s["available_beds"], total_beds), key=f"ab_{i}")
+    col6, col7 = st.columns(2)
 
-    if col6.button("❌ Remove", key=f"del_{i}"):
-        if len(st.session_state.sharing_data) > 1:
-            st.session_state.sharing_data.pop(i)
+    price = col6.number_input("Price", value=r["price"], key=f"price_{i}")
+    deposit = col7.number_input("Deposit", value=r["deposit"], key=f"dep_{i}")
+
+    if st.button("❌ Remove Room", key=f"del_room_{i}"):
+        if len(st.session_state.rooms) > 1:
+            st.session_state.rooms.pop(i)
             st.rerun()
 
-    updated.append({
-        "type": share_type,
-        "price": price,
-        "deposit": deposit,
+    updated_rooms.append({
+        "floor": floor,
+        "room_no": room_no,
+        "sharing": sharing,
         "total_beds": total_beds,
-        "available_beds": available_beds
+        "available_beds": available_beds,
+        "price": price,
+        "deposit": deposit
     })
 
-st.session_state.sharing_data = updated
+st.session_state.rooms = updated_rooms
 
-if st.button("➕ Add Sharing"):
-    st.session_state.sharing_data.append({
-        "type": "2 Sharing",
-        "price": 5000,
-        "deposit": 2000,
+if st.button("➕ Add Room"):
+    st.session_state.rooms.append({
+        "floor": 1,
+        "room_no": "",
+        "sharing": "2 Sharing",
         "total_beds": 2,
-        "available_beds": 1
+        "available_beds": 1,
+        "price": 5000,
+        "deposit": 2000
     })
     st.rerun()
 
@@ -180,7 +192,12 @@ with st.form("pg_form"):
 # ---------------- PREVIEW ----------------
 if preview:
     rating = round((clean + food_rating + safety + value + crowd) / 5, 1)
-    st.json({"name": name, "location": location, "rating": rating})
+    st.json({
+        "PG Name": name,
+        "Location": location,
+        "Rooms": st.session_state.rooms,
+        "Rating": rating
+    })
     st.session_state.preview = True
 
 # ---------------- SAVE ----------------
@@ -195,44 +212,58 @@ if save:
 
     headers = sheet.row_values(1)
 
-    row_data = {
-        "pg_id": pg_id,
-        "pg_name": name,
-        "location": location,
-        "owner_name": owner_name,
-        "owner_number": owner_number,
-        "sharing_json": json.dumps(st.session_state.sharing_data),
-        "food_type": food_type,
-        "laundry": laundry,
-        "room_type": room_type,
-        "gender": gender,
-        "metro (m)": metro_dist,
-        "bus (m)": bus_dist,
-        "rail (m)": rail_dist,
-        "nearby places": nearby_places,
-        "clean": clean,
-        "food": food_rating,
-        "safety": safety,
-        "value": value,
-        "crowd": crowd,
-        "rating": rating,
-        "notes": notes,
-        "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    }
+    for room in st.session_state.rooms:
 
-    final_row = [row_data.get(normalize_header(h), "") for h in headers]
+        row_data = {
+            "pg_id": pg_id,
+            "pg_name": name,
+            "location": location,
+            "owner_name": owner_name,
+            "owner_number": owner_number,
 
-    sheet.append_row(final_row)
+            "floor": room["floor"],
+            "room_no": room["room_no"],
+            "sharing_type": room["sharing"],
+            "total_beds": room["total_beds"],
+            "available_beds": room["available_beds"],
+            "price": room["price"],
+            "deposit": room["deposit"],
 
-    st.success(f"✅ Saved {pg_id}")
+            "food_type": food_type,
+            "laundry": laundry,
+            "room_type": room_type,
+            "gender": gender,
+
+            "metro (m)": metro_dist,
+            "bus (m)": bus_dist,
+            "rail (m)": rail_dist,
+            "nearby places": nearby_places,
+
+            "clean": clean,
+            "food": food_rating,
+            "safety": safety,
+            "value": value,
+            "crowd": crowd,
+            "rating": rating,
+
+            "notes": notes,
+            "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
+
+        final_row = [row_data.get(normalize_header(h), "") for h in headers]
+        sheet.append_row(final_row)
+
+    st.success(f"✅ Saved {pg_id} with {len(st.session_state.rooms)} rooms")
 
     # RESET
-    st.session_state.sharing_data = [{
-        "type": "2 Sharing",
-        "price": 6000,
-        "deposit": 2000,
+    st.session_state.rooms = [{
+        "floor": 1,
+        "room_no": "101",
+        "sharing": "2 Sharing",
         "total_beds": 2,
-        "available_beds": 1
+        "available_beds": 1,
+        "price": 6000,
+        "deposit": 2000
     }]
 
     reset_form()
