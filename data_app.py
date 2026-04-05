@@ -1,5 +1,4 @@
 import streamlit as st
-import pandas as pd
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
@@ -21,7 +20,7 @@ creds = ServiceAccountCredentials.from_json_keyfile_dict(
 client = gspread.authorize(creds)
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
-# ---------------- STATE ----------------
+# ---------------- SESSION ----------------
 if "saved_rooms" not in st.session_state:
     st.session_state.saved_rooms = []
 
@@ -37,21 +36,26 @@ def next_room_number(floor):
                 nums.append(int(str(r["room_no"])[-2:]))
             except:
                 pass
+
     next_num = max(nums) + 1 if nums else 1
     return f"{floor}{next_num:02d}"
 
-# ---------------- RESET FORM ----------------
+# ---------------- SAFE RESET ----------------
 def reset_form():
+    keys = ["floor","room_no","sharing","total_beds","available_beds","price","deposit"]
+    for k in keys:
+        if k in st.session_state:
+            del st.session_state[k]
+
+# INIT DEFAULT VALUES
+if "floor" not in st.session_state:
     st.session_state.floor = 1
-    st.session_state.room_no = next_room_number(1)
+    st.session_state.room_no = "101"
     st.session_state.sharing = "2 Sharing"
     st.session_state.total_beds = 2
     st.session_state.available_beds = 1
     st.session_state.price = 6000
     st.session_state.deposit = 2000
-
-if "floor" not in st.session_state:
-    reset_form()
 
 # ---------------- ROOMS ----------------
 st.subheader("🛏 Rooms")
@@ -60,6 +64,7 @@ if st.session_state.saved_rooms:
     st.markdown("### ✅ Added Rooms")
 
     for i, r in enumerate(st.session_state.saved_rooms):
+
         col1, col2, col3, col4, col5 = st.columns([2,2,2,1,1])
 
         col1.write(f"Room {r['room_no']}")
@@ -69,6 +74,7 @@ if st.session_state.saved_rooms:
         # EDIT
         if col4.button("✏️", key=f"edit_{i}"):
             st.session_state.edit_index = i
+
             st.session_state.floor = r["floor"]
             st.session_state.room_no = r["room_no"]
             st.session_state.sharing = r["sharing"]
@@ -76,29 +82,32 @@ if st.session_state.saved_rooms:
             st.session_state.available_beds = r["available_beds"]
             st.session_state.price = r["price"]
             st.session_state.deposit = r["deposit"]
+
             st.rerun()
 
         # DELETE
         if col5.button("❌", key=f"del_{i}"):
             st.session_state.saved_rooms.pop(i)
+
             if st.session_state.edit_index == i:
                 st.session_state.edit_index = None
+
             st.rerun()
 
-# MODE LABEL
+# MODE
 if st.session_state.edit_index is not None:
     st.warning("✏️ Editing Room")
 else:
     st.success("➕ Add New Room")
 
-# ---------------- ROOM FORM ----------------
+# ---------------- FORM ----------------
 st.markdown("### ✏️ Room Entry")
 
 col1, col2 = st.columns(2)
 
 floor = col1.number_input("Floor", 0, 20, key="floor")
 
-# AUTO ROOM NUMBER
+# AUTO ROOM NUMBER (only when not editing)
 if st.session_state.edit_index is None:
     st.session_state.room_no = next_room_number(floor)
 
@@ -122,10 +131,9 @@ col6, col7 = st.columns(2)
 price = col6.number_input("Price", 0, step=500, key="price")
 deposit = col7.number_input("Deposit", 0, step=500, key="deposit")
 
-# BUTTON TEXT
+# BUTTON
 btn = "💾 Update Room" if st.session_state.edit_index is not None else "➕ Add Room"
 
-# ADD / UPDATE ROOM
 if st.button(btn):
 
     new_data = {
@@ -138,9 +146,7 @@ if st.button(btn):
         "deposit": deposit
     }
 
-    if st.session_state.edit_index is not None and \
-       st.session_state.edit_index < len(st.session_state.saved_rooms):
-
+    if st.session_state.edit_index is not None:
         st.session_state.saved_rooms[st.session_state.edit_index] = new_data
     else:
         st.session_state.saved_rooms.append(new_data)
@@ -164,26 +170,26 @@ st.subheader("🏢 PG Details")
 
 col1, col2 = st.columns(2)
 
-pg_name = col1.text_input("PG Name", key="pg_name")
-owner = col2.text_input("Owner Number", key="owner")
+pg_name = col1.text_input("PG Name")
+owner = col2.text_input("Owner Number")
 
-area = st.selectbox("Area", ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"], key="area")
-locality = st.text_input("Locality", key="locality")
+area = st.selectbox("Area", ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"])
+locality = st.text_input("Locality")
 
 col3, col4 = st.columns(2)
 
-gender = col3.selectbox("Gender", ["Male", "Female", "Co-Living"], key="gender")
-room_type = col4.selectbox("Room Type", ["AC", "Non AC"], key="room_type")
+gender = col3.selectbox("Gender", ["Male", "Female", "Co-Living"])
+room_type = col4.selectbox("Room Type", ["AC", "Non AC"])
 
-laundry = st.selectbox("Laundry", ["Yes", "No"], key="laundry")
+laundry = st.selectbox("Laundry", ["Yes", "No"])
 
 st.subheader("⭐ Ratings")
 
-food = st.slider("Food", 0, 10, 7, key="food")
-clean = st.slider("Cleanliness", 0, 10, 7, key="clean")
-safety = st.slider("Safety", 0, 10, 8, key="safety")
+food = st.slider("Food", 0, 10, 7)
+clean = st.slider("Cleanliness", 0, 10, 7)
+safety = st.slider("Safety", 0, 10, 8)
 
-# ---------------- FINAL SAVE ----------------
+# ---------------- SAVE ----------------
 if st.button("🚀 Final Save"):
 
     if not pg_name or not owner:
