@@ -34,7 +34,6 @@ def next_room_number(floor):
                 nums.append(int(str(r["room_no"])[-2:]))
             except:
                 pass
-
     next_num = max(nums) + 1 if nums else 1
     return f"{floor}{next_num:02d}"
 
@@ -48,19 +47,16 @@ def reset_form():
     st.session_state.price = 6000
     st.session_state.deposit = 2000
 
-# INIT
 if "floor" not in st.session_state:
     reset_form()
 
 # ---------------- ROOMS ----------------
 st.subheader("🛏 Rooms")
 
-# TABLE
 if st.session_state.saved_rooms:
     st.markdown("### ✅ Added Rooms")
 
     for i, r in enumerate(st.session_state.saved_rooms):
-
         col1, col2, col3, col4, col5 = st.columns([2,2,2,1,1])
 
         col1.write(f"Room {r['room_no']}")
@@ -69,9 +65,7 @@ if st.session_state.saved_rooms:
 
         # EDIT
         if col4.button("✏️", key=f"edit_{i}"):
-
             st.session_state.edit_index = i
-
             st.session_state.floor = r["floor"]
             st.session_state.room_no = r["room_no"]
             st.session_state.sharing = r["sharing"]
@@ -79,12 +73,10 @@ if st.session_state.saved_rooms:
             st.session_state.available_beds = r["available_beds"]
             st.session_state.price = r["price"]
             st.session_state.deposit = r["deposit"]
-
             st.rerun()
 
         # DELETE
         if col5.button("❌", key=f"del_{i}"):
-
             st.session_state.saved_rooms.pop(i)
 
             if st.session_state.edit_index == i:
@@ -92,7 +84,7 @@ if st.session_state.saved_rooms:
 
             st.rerun()
 
-# MODE
+# MODE LABEL
 if st.session_state.edit_index is not None:
     st.warning("✏️ Editing Room")
 else:
@@ -104,6 +96,11 @@ st.markdown("### ✏️ Room Entry")
 col1, col2 = st.columns(2)
 
 floor = col1.number_input("Floor", 0, 20, key="floor")
+
+# AUTO ROOM NUMBER (important fix)
+if st.session_state.edit_index is None:
+    st.session_state.room_no = next_room_number(floor)
+
 room_no = col2.text_input("Room No", key="room_no")
 
 col3, col4, col5 = st.columns(3)
@@ -124,9 +121,10 @@ col6, col7 = st.columns(2)
 price = col6.number_input("Price", 0, step=500, key="price")
 deposit = col7.number_input("Deposit", 0, step=500, key="deposit")
 
-# BUTTON
+# BUTTON TEXT
 btn = "💾 Update Room" if st.session_state.edit_index is not None else "➕ Add Room"
 
+# ADD / UPDATE ROOM
 if st.button(btn):
 
     new_data = {
@@ -184,7 +182,7 @@ food = st.slider("Food", 0, 10, 7, key="food")
 clean = st.slider("Cleanliness", 0, 10, 7, key="clean")
 safety = st.slider("Safety", 0, 10, 8, key="safety")
 
-# ---------------- SAVE ----------------
+# ---------------- FINAL SAVE ----------------
 if st.button("🚀 Final Save"):
 
     if not pg_name or not owner:
