@@ -14,7 +14,10 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-creds = ServiceAccountCredentials.from_json_keyfile_dict(st.secrets["gcp"], scope)
+creds = ServiceAccountCredentials.from_json_keyfile_dict(
+    st.secrets["gcp_service_account"], scope
+)
+
 client = gspread.authorize(creds)
 sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet1
 
@@ -78,10 +81,8 @@ if st.session_state.saved_rooms:
         # DELETE
         if col5.button("❌", key=f"del_{i}"):
             st.session_state.saved_rooms.pop(i)
-
             if st.session_state.edit_index == i:
                 st.session_state.edit_index = None
-
             st.rerun()
 
 # MODE LABEL
@@ -97,7 +98,7 @@ col1, col2 = st.columns(2)
 
 floor = col1.number_input("Floor", 0, 20, key="floor")
 
-# AUTO ROOM NUMBER (important fix)
+# AUTO ROOM NUMBER
 if st.session_state.edit_index is None:
     st.session_state.room_no = next_room_number(floor)
 
@@ -121,10 +122,9 @@ col6, col7 = st.columns(2)
 price = col6.number_input("Price", 0, step=500, key="price")
 deposit = col7.number_input("Deposit", 0, step=500, key="deposit")
 
-# BUTTON TEXT
+# BUTTON
 btn = "💾 Update Room" if st.session_state.edit_index is not None else "➕ Add Room"
 
-# ADD / UPDATE ROOM
 if st.button(btn):
 
     new_data = {
