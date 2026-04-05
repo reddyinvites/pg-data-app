@@ -17,17 +17,46 @@ try:
     creds = ServiceAccountCredentials.from_json_keyfile_dict(
         dict(st.secrets["gcp_service_account"]), scope
     )
-
     client = gspread.authorize(creds)
 
     sheet = client.open_by_key(
         "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
     ).sheet1
 
+    area_sheet = client.open_by_key(
+        "1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q"
+    ).worksheet("Areas")
+
 except Exception as e:
     st.error("❌ Google Sheets connection failed")
     st.write(e)
     st.stop()
+
+# ---------------- LOAD AREA + LOCALITY ----------------
+try:
+    data = area_sheet.get_all_values()
+
+    area_locality_map = {}
+
+    for row in data:
+        if len(row) < 2:
+            continue
+
+        area = row[0].strip()
+        locality = row[1].strip()
+
+        if area and locality:
+            if area not in area_locality_map:
+                area_locality_map[area] = []
+
+            if locality not in area_locality_map[area]:
+                area_locality_map[area].append(locality)
+
+    area_list = list(area_locality_map.keys())
+
+except:
+    area_list = ["Gachibowli"]
+    area_locality_map = {"Gachibowli": ["DLF"]}
 
 # ---------------- SESSION ----------------
 if "saved_rooms" not in st.session_state:
@@ -79,7 +108,6 @@ if st.session_state.saved_rooms:
         col2.write(r["sharing"])
         col3.write(f"₹{r['price']}")
 
-        # EDIT
         if col4.button("✏️", key=f"edit_{i}"):
             st.session_state.edit_index = i
             st.session_state.floor = r["floor"]
@@ -91,16 +119,9 @@ if st.session_state.saved_rooms:
             st.session_state.deposit = r["deposit"]
             st.rerun()
 
-        # DELETE
         if col5.button("❌", key=f"del_{i}"):
             st.session_state.saved_rooms.pop(i)
-            if st.session_state.edit_index == i:
-                st.session_state.edit_index = None
             st.rerun()
-
-# MODE
-if st.session_state.edit_index is not None:
-    st.warning("✏️ Editing Room")
 
 # ---------------- FORM ----------------
 st.markdown("### ✏️ Room Entry")
@@ -109,7 +130,6 @@ col1, col2 = st.columns(2)
 
 floor = col1.number_input("Floor", 0, 20, key="floor")
 
-# AUTO ROOM NUMBER
 if st.session_state.edit_index is None:
     st.session_state.room_no = next_room_number(floor)
 
@@ -117,8 +137,7 @@ room_no = col2.text_input("Room No", key="room_no")
 
 col3, col4, col5 = st.columns(3)
 
-sharing = col3.selectbox(
-    "Sharing",
+sharing = col3.selectbox("Sharing",
     ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
     key="sharing"
 )
@@ -133,11 +152,9 @@ col6, col7 = st.columns(2)
 price = col6.number_input("Price", 0, step=500, key="price")
 deposit = col7.number_input("Deposit", 0, step=500, key="deposit")
 
-# BUTTON
-btn = "💾 Update Room" if st.session_state.edit_index is not None else "➕ Add Room"
+btn = "💾 Update Room" if st.session_state.edit_index else "➕ Add Room"
 
 if st.button(btn):
-
     new_data = {
         "floor": floor,
         "room_no": room_no,
@@ -157,7 +174,6 @@ if st.button(btn):
     reset_form()
     st.rerun()
 
-# ---------------- SPACING ----------------
 st.markdown("---")
 
 # ---------------- PG DETAILS ----------------
@@ -168,8 +184,23 @@ col1, col2 = st.columns(2)
 pg_name = col1.text_input("PG Name")
 owner = col2.text_input("Owner Number")
 
-area = st.selectbox("Area", ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"])
-locality = st.text_input("Locality")
+# 🔍 SEARCHABLE DROPDOWN
+area = st.selectbox("Area", area_list)
+
+localities = area_locality_map.get(area, [])
+locality = st.selectbox("Locality", localities)
+
+# ➕ ADD NEW LOCALITY
+with st.expander("➕ Add New Locality"):
+    new_area = st.text_input("Area Name")
+    new_locality = st.text_input("Locality Name")
+
+    if st.button("Save Locality"):
+        if new_area and new_locality:
+            area_sheet.append_row([new_area, new_locality])
+            st.success("✅ Added successfully! Refresh page")
+        else:
+            st.error("Enter both fields")
 
 col3, col4 = st.columns(2)
 
@@ -220,8 +251,6 @@ if st.button("🚀 Final Save"):
             sheet.append_row(final_row)
 
         st.success("✅ Saved Successfully!")
-
         st.session_state.saved_rooms = []
-        st.session_state.edit_index = None
         reset_form()
         st.rerun()
