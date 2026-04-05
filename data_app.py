@@ -37,6 +37,12 @@ if "edit_index" not in st.session_state:
     st.session_state.edit_index = None
 
 
+# ---------------- SAFETY CHECK ----------------
+if st.session_state.edit_index is not None and \
+   st.session_state.edit_index >= len(st.session_state.saved_rooms):
+    st.session_state.edit_index = None
+
+
 # ---------------- ROOM NUMBER ----------------
 def next_room_number(floor):
     nums = []
@@ -59,27 +65,39 @@ if st.session_state.saved_rooms:
     st.markdown("### ✅ Added Rooms")
 
     for i, r in enumerate(st.session_state.saved_rooms):
+
         col1, col2, col3, col4, col5 = st.columns([2,2,2,1,1])
 
         col1.write(f"Room {r['room_no']}")
         col2.write(r["sharing"])
         col3.write(f"₹{r['price']}")
 
+        # EDIT
         if col4.button("✏️", key=f"edit_{i}"):
             st.session_state.current_room = r.copy()
             st.session_state.edit_index = i
             st.rerun()
 
+        # DELETE
         if col5.button("❌", key=f"del_{i}"):
+
             st.session_state.saved_rooms.pop(i)
+
+            # FIX INDEX SHIFT
+            if st.session_state.edit_index == i:
+                st.session_state.edit_index = None
+            elif st.session_state.edit_index is not None and st.session_state.edit_index > i:
+                st.session_state.edit_index -= 1
+
             st.rerun()
 
 
-# FORM LABEL
+# LABEL
 if st.session_state.edit_index is not None:
     st.warning("✏️ Editing Room")
 else:
     st.info("➕ Add New Room")
+
 
 # FORM
 st.markdown("### ✏️ Room Entry")
@@ -124,18 +142,21 @@ if st.button("➕ Add Room"):
         "deposit": deposit
     }
 
-    if st.session_state.edit_index is not None:
+    # SAFE EDIT
+    if st.session_state.edit_index is not None and \
+       st.session_state.edit_index < len(st.session_state.saved_rooms):
+
         st.session_state.saved_rooms[st.session_state.edit_index] = new_data
-        st.session_state.edit_index = None
+
     else:
         st.session_state.saved_rooms.append(new_data)
 
-    # RESET FORM
-    new_room = next_room_number(floor)
+    # RESET
+    st.session_state.edit_index = None
 
     st.session_state.current_room = {
         "floor": floor,
-        "room_no": new_room,
+        "room_no": next_room_number(floor),
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
@@ -156,7 +177,7 @@ available = sum(r["available_beds"] for r in st.session_state.saved_rooms)
 st.info(f"Rooms: {total_rooms} | Beds: {total_beds} | Available: {available}")
 
 
-# ---------------- PG FORM ----------------
+# ---------------- PG DETAILS ----------------
 st.subheader("🏢 PG Details")
 
 col1, col2 = st.columns(2)
@@ -217,23 +238,7 @@ if st.button("🚀 Final Save"):
 
         st.success("✅ All Data Saved!")
 
-        # RESET FORM
         st.session_state.saved_rooms = []
-        st.session_state.current_room = {
-            "floor": 1,
-            "room_no": "101",
-            "sharing": "2 Sharing",
-            "total_beds": 2,
-            "available_beds": 1,
-            "price": 6000,
-            "deposit": 2000
-        }
-
-        # CLEAR PG FORM
-        for key in ["pg_name_input","owner_input","area_input","locality_input",
-                    "gender_input","roomtype_input","laundry_input",
-                    "food_input","clean_input","safety_input"]:
-            if key in st.session_state:
-                del st.session_state[key]
+        st.session_state.edit_index = None
 
         st.rerun()
