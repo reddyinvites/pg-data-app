@@ -9,10 +9,10 @@ st.set_page_config(page_title="PG Manager", layout="wide")
 # ---------------- RESET ----------------
 def reset_form():
     for key in list(st.session_state.keys()):
-        if key.startswith(("floor_", "room_", "share_", "tb_", "ab_", "price_", "dep_")):
+        if key.startswith(("floor_", "share_", "tb_", "ab_", "price_", "dep_")):
             del st.session_state[key]
 
-    for k in ["name", "owner_number"]:
+    for k in ["name", "owner_number", "area", "locality"]:
         if k in st.session_state:
             del st.session_state[k]
 
@@ -75,65 +75,59 @@ def generate_pg_id(df):
     return f"PG{max(nums)+1:03d}" if nums else "PG001"
 
 # ---------------- ROOMS ----------------
+st.subheader("🛏 Rooms")
+
 if "rooms" not in st.session_state:
-    st.session_state.rooms = [{
+    st.session_state.rooms = []
+
+def generate_room_number(floor, index):
+    return f"{floor}{str(index+1).zfill(2)}"
+
+def add_room():
+    st.session_state.rooms.append({
         "floor": 1,
-        "room_no": "",
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
         "price": 6000,
         "deposit": 2000
-    }]
+    })
 
-st.subheader("🛏 Rooms")
+def remove_room(i):
+    st.session_state.rooms.pop(i)
+
+# ➕ Add Room Button
+st.button("➕ Add Room", on_click=add_room)
 
 updated_rooms = []
 
 for i, r in enumerate(st.session_state.rooms):
 
-    col1, col2 = st.columns(2)
+    cols = st.columns([1,1,1,1,1,1,1,0.5])
 
-    floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
+    floor = cols[0].number_input("Floor", 1, 20, value=r["floor"], key=f"floor_{i}")
 
-    # AUTO ROOM UPDATE
-    room_key = f"room_{i}"
-    auto_room = f"{floor}01"
+    room_no = generate_room_number(floor, i)
+    cols[1].text_input("Room No", value=room_no, disabled=True)
 
-    if room_key not in st.session_state:
-        st.session_state[room_key] = auto_room
-    else:
-        if st.session_state[room_key].endswith("01"):
-            st.session_state[room_key] = auto_room
-
-    room_no = col2.text_input("Room No", key=room_key)
-
-    col3, col4, col5 = st.columns(3)
-
-    sharing = col3.selectbox(
+    sharing = cols[2].selectbox(
         "Sharing",
         ["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"],
-        index=["1 Sharing", "2 Sharing", "3 Sharing", "4 Sharing"].index(r["sharing"]),
+        index=["1 Sharing","2 Sharing","3 Sharing","4 Sharing"].index(r["sharing"]),
         key=f"share_{i}"
     )
 
     max_beds = int(sharing.split()[0])
 
-    total_beds = col4.number_input("Beds", 1, max_beds, value=r["total_beds"], key=f"tb_{i}")
-    available_beds = col5.number_input("Available", 0, total_beds, value=r["available_beds"], key=f"ab_{i}")
+    total_beds = cols[3].number_input("Beds", 1, max_beds, value=r["total_beds"], key=f"tb_{i}")
+    available_beds = cols[4].number_input("Available", 0, total_beds, value=r["available_beds"], key=f"ab_{i}")
 
-    if available_beds > total_beds:
-        st.error("Available beds > total beds")
+    price = cols[5].number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
+    deposit = cols[6].number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
 
-    col6, col7 = st.columns(2)
-
-    price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
-    deposit = col7.number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
-
-    if st.button("❌ Remove", key=f"del_{i}"):
-        if len(st.session_state.rooms) > 1:
-            st.session_state.rooms.pop(i)
-            st.rerun()
+    if cols[7].button("❌", key=f"del_{i}"):
+        remove_room(i)
+        st.rerun()
 
     updated_rooms.append({
         "floor": floor,
@@ -147,27 +141,6 @@ for i, r in enumerate(st.session_state.rooms):
 
 st.session_state.rooms = updated_rooms
 
-if st.button("➕ Add Room"):
-    st.session_state.rooms.append({
-        "floor": 1,
-        "room_no": "",
-        "sharing": "2 Sharing",
-        "total_beds": 2,
-        "available_beds": 1,
-        "price": 6000,
-        "deposit": 2000
-    })
-    st.rerun()
-
-# ---------------- SUMMARY ----------------
-st.subheader("📊 Summary")
-
-total_rooms = len(st.session_state.rooms)
-total_beds = sum(r["total_beds"] for r in st.session_state.rooms)
-available = sum(r["available_beds"] for r in st.session_state.rooms)
-
-st.info(f"Rooms: {total_rooms} | Beds: {total_beds} | Available: {available}")
-
 # ---------------- FORM ----------------
 with st.form("pg_form"):
 
@@ -176,22 +149,21 @@ with st.form("pg_form"):
     name = col1.text_input("PG Name", key="name")
     owner_number = col2.text_input("Owner Number", key="owner_number")
 
-    # SMART LOCATION
-    area = st.selectbox(
-        "Area",
-        ["Gachibowli", "Kondapur", "Madhapur", "Hitech City"]
-    )
-
-    locality_options = {
+    # LOCATION FIXED
+    area_localities = {
         "Gachibowli": ["Telecom Nagar", "Indira Nagar", "Anjaiah Nagar", "DLF Area", "Financial District"],
         "Kondapur": ["Raghavendra Colony", "Botanical Garden", "Masjid Banda"],
         "Madhapur": ["Ayyappa Society", "100ft Road", "Cyber Hills"],
         "Hitech City": ["Shilparamam", "Mindspace", "Raidurg"]
     }
 
-    locality_list = locality_options.get(area, []) + ["Other"]
+    area = st.selectbox("Area", list(area_localities.keys()), key="area")
 
-    locality = st.selectbox("Locality / Street", locality_list)
+    locality = st.selectbox(
+        "Locality / Street",
+        area_localities[area] + ["Other"],
+        key="locality"
+    )
 
     if locality == "Other":
         locality = st.text_input("Enter Locality")
@@ -271,16 +243,7 @@ if save:
 
     st.success(f"✅ Saved {pg_id}")
 
-    st.session_state.rooms = [{
-        "floor": 1,
-        "room_no": "",
-        "sharing": "2 Sharing",
-        "total_beds": 2,
-        "available_beds": 1,
-        "price": 6000,
-        "deposit": 2000
-    }]
-
+    st.session_state.rooms = []
     reset_form()
 
     if "preview" in st.session_state:
