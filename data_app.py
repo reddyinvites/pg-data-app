@@ -12,8 +12,7 @@ def reset_form():
         if key.startswith(("floor_", "room_", "share_", "tb_", "ab_", "price_", "dep_")):
             del st.session_state[key]
 
-    keys = ["name", "location", "owner_number"]
-    for k in keys:
+    for k in ["name", "location", "owner_number"]:
         if k in st.session_state:
             del st.session_state[k]
 
@@ -51,7 +50,7 @@ sheet = client.open_by_key("1y60dTYBKgkOi7J37jtGK4BkkmUoZF8yD4P5J3xA5q6Q").sheet
 
 st.title("🏠 PG Manager - Quick Entry")
 
-# ---------------- LOAD DATA ----------------
+# ---------------- LOAD ----------------
 data = sheet.get_all_records()
 df = pd.DataFrame(data)
 
@@ -97,14 +96,18 @@ for i, r in enumerate(st.session_state.rooms):
 
     floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
 
-    # ✅ AUTO ROOM FIX
+    # ✅ AUTO ROOM FIX (SESSION STATE BASED)
+    room_key = f"room_{i}"
     auto_room = f"{floor}01"
-    if r["room_no"] == "" or r["room_no"].endswith("01"):
-        room_val = auto_room
-    else:
-        room_val = r["room_no"]
 
-    room_no = col2.text_input("Room No", value=room_val, key=f"room_{i}")
+    if room_key not in st.session_state:
+        st.session_state[room_key] = auto_room
+    else:
+        prev_val = st.session_state[room_key]
+        if prev_val.endswith("01"):
+            st.session_state[room_key] = auto_room
+
+    room_no = col2.text_input("Room No", key=room_key)
 
     col3, col4, col5 = st.columns(3)
 
@@ -125,7 +128,7 @@ for i, r in enumerate(st.session_state.rooms):
 
     col6, col7 = st.columns(2)
 
-    # ✅ ₹500 STEP FIX
+    # ✅ ₹500 STEP
     price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
     deposit = col7.number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
 
@@ -167,7 +170,7 @@ available = sum(r["available_beds"] for r in st.session_state.rooms)
 
 st.info(f"Rooms: {total_rooms} | Beds: {total_beds} | Available: {available}")
 
-# ---------------- QUICK FORM ----------------
+# ---------------- FORM ----------------
 with st.form("pg_form"):
 
     col1, col2 = st.columns(2)
@@ -182,7 +185,7 @@ with st.form("pg_form"):
     gender = col3.selectbox("Gender", ["Male", "Female"])
     room_type = col4.selectbox("Room Type", ["AC", "Non AC"])
 
-    # ✅ Laundry added
+    # ✅ Laundry
     laundry = st.selectbox("Laundry", ["Yes", "No"], index=0)
 
     preview = st.form_submit_button("👁 Preview")
@@ -211,6 +214,7 @@ if save:
         st.error("Fill required fields")
         st.stop()
 
+    # duplicate check
     seen = set()
     for r in st.session_state.rooms:
         key = (r["floor"], r["room_no"])
@@ -251,6 +255,7 @@ if save:
 
     st.success(f"✅ Saved {pg_id}")
 
+    # reset
     st.session_state.rooms = [{
         "floor": 1,
         "room_no": "",
