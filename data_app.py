@@ -97,8 +97,14 @@ for i, r in enumerate(st.session_state.rooms):
 
     floor = col1.number_input("Floor", 0, 20, value=r["floor"], key=f"floor_{i}")
 
-    default_room = f"{floor}01" if r["room_no"] == "" else r["room_no"]
-    room_no = col2.text_input("Room No", value=default_room, key=f"room_{i}")
+    # ✅ AUTO ROOM FIX
+    auto_room = f"{floor}01"
+    if r["room_no"] == "" or r["room_no"].endswith("01"):
+        room_val = auto_room
+    else:
+        room_val = r["room_no"]
+
+    room_no = col2.text_input("Room No", value=room_val, key=f"room_{i}")
 
     col3, col4, col5 = st.columns(3)
 
@@ -119,8 +125,9 @@ for i, r in enumerate(st.session_state.rooms):
 
     col6, col7 = st.columns(2)
 
-    price = col6.number_input("Price", value=r["price"], key=f"price_{i}")
-    deposit = col7.number_input("Deposit", value=r["deposit"], key=f"dep_{i}")
+    # ✅ ₹500 STEP FIX
+    price = col6.number_input("Price", min_value=0, step=500, value=r["price"], key=f"price_{i}")
+    deposit = col7.number_input("Deposit", min_value=0, step=500, value=r["deposit"], key=f"dep_{i}")
 
     if st.button("❌ Remove", key=f"del_{i}"):
         if len(st.session_state.rooms) > 1:
@@ -146,7 +153,7 @@ if st.button("➕ Add Room"):
         "sharing": "2 Sharing",
         "total_beds": 2,
         "available_beds": 1,
-        "price": 5000,
+        "price": 6000,
         "deposit": 2000
     })
     st.rerun()
@@ -175,12 +182,14 @@ with st.form("pg_form"):
     gender = col3.selectbox("Gender", ["Male", "Female"])
     room_type = col4.selectbox("Room Type", ["AC", "Non AC"])
 
+    # ✅ Laundry added
+    laundry = st.selectbox("Laundry", ["Yes", "No"], index=0)
+
     preview = st.form_submit_button("👁 Preview")
     save = st.form_submit_button("💾 Save")
 
-# ---------------- DEFAULTS ----------------
+# ---------------- DEFAULT ----------------
 food_type = "Veg"
-laundry = "Yes"
 
 # ---------------- PREVIEW ----------------
 if preview:
@@ -202,7 +211,6 @@ if save:
         st.error("Fill required fields")
         st.stop()
 
-    # duplicate check
     seen = set()
     for r in st.session_state.rooms:
         key = (r["floor"], r["room_no"])
