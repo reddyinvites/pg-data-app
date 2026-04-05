@@ -7,7 +7,7 @@ st.set_page_config(page_title="PG Manager", layout="wide")
 
 st.title("🏠 PG Manager - Smart Entry")
 
-# ---------------- GOOGLE SHEETS (FIXED) ----------------
+# ---------------- GOOGLE SHEETS ----------------
 scope = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
@@ -98,7 +98,7 @@ if st.session_state.saved_rooms:
                 st.session_state.edit_index = None
             st.rerun()
 
-# MODE (clean)
+# MODE
 if st.session_state.edit_index is not None:
     st.warning("✏️ Editing Room")
 
@@ -157,14 +157,8 @@ if st.button(btn):
     reset_form()
     st.rerun()
 
-# ---------------- SUMMARY ----------------
-st.subheader("📊 Summary")
-
-st.info(
-    f"Rooms: {len(st.session_state.saved_rooms)} | "
-    f"Beds: {sum(r['total_beds'] for r in st.session_state.saved_rooms)} | "
-    f"Available: {sum(r['available_beds'] for r in st.session_state.saved_rooms)}"
-)
+# ---------------- SPACING ----------------
+st.markdown("---")
 
 # ---------------- PG DETAILS ----------------
 st.subheader("🏢 PG Details")
@@ -184,6 +178,7 @@ room_type = col4.selectbox("Room Type", ["AC", "Non AC"])
 
 laundry = st.selectbox("Laundry", ["Yes", "No"])
 
+# ---------------- RATINGS ----------------
 st.subheader("⭐ Ratings")
 
 food = st.slider("Food", 0, 10, 7)
