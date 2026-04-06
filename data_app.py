@@ -2,7 +2,6 @@ import streamlit as st
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import time
 
 st.set_page_config(page_title="PG Manager", layout="wide")
 st.title("🏠 PG Manager - Smart Entry")
@@ -51,21 +50,12 @@ def generate_pg_id(sheet):
     except:
         return "PG0001"
 
-# ---------------- RESET PG ----------------
-def reset_pg_form():
-    keys = [
-        "pg_name","owner","area","locality",
-        "gender","room_type","laundry","food_type"
-    ]
-    for k in keys:
-        if k in st.session_state:
-            del st.session_state[k]
-
 # ---------------- AREA DATA ----------------
 @st.cache_data(ttl=60)
 def load_area_data():
     data = area_sheet.get_all_values()
     m = {}
+
     for row in data:
         if len(row) < 2:
             continue
@@ -74,6 +64,7 @@ def load_area_data():
             m.setdefault(a, [])
             if l not in m[a]:
                 m[a].append(l)
+
     return m
 
 area_locality_map = load_area_data()
@@ -162,16 +153,61 @@ st.markdown("---")
 # ---------------- PG DETAILS ----------------
 st.subheader("🏢 PG Details")
 
-pg_name = st.text_input("PG Name", key="pg_name")
-owner = st.text_input("Owner Number", key="owner")
+pg_name = st.text_input("PG Name")
+owner = st.text_input("Owner Number")
 
-area = st.selectbox("Area", area_list, key="area")
-locality = st.selectbox("Locality", area_locality_map.get(area, []), key="locality")
+area = st.selectbox("Area", area_list)
+locality = st.selectbox("Locality", area_locality_map.get(area, []))
 
-gender = st.selectbox("Gender",["Male","Female","Co-Living"], key="gender")
-room_type = st.selectbox("Room Type",["AC","Non AC"], key="room_type")
-laundry = st.selectbox("Laundry",["Yes","No"], key="laundry")
-food_type = st.selectbox("Food Type",["Veg","Non Veg","Both"], key="food_type")
+# ➕ ADD LOCALITY
+with st.expander("➕ Add New Locality"):
+    na = st.text_input("Area", key="na")
+    nl = st.text_input("Locality", key="nl")
+
+    if st.button("Add Locality"):
+        if not na or not nl:
+            st.error("Enter both")
+        elif nl in area_locality_map.get(na, []):
+            st.warning("Exists")
+        else:
+            area_sheet.append_row([na, nl])
+            load_area_data.clear()
+            st.success("Added!")
+            st.rerun()
+
+# ✏️ EDIT DELETE
+with st.expander("✏️ Manage Localities"):
+    ma = st.selectbox("Area", area_list, key="ma")
+    locs = area_locality_map.get(ma, [])
+
+    if locs:
+        ml = st.selectbox("Locality", locs, key="ml")
+        new = st.text_input("Edit", value=ml)
+
+        cA,cB = st.columns(2)
+
+        if cA.button("Update"):
+            rows = area_sheet.get_all_values()
+            for i,r in enumerate(rows,1):
+                if len(r)>=2 and r[0]==ma and r[1]==ml:
+                    area_sheet.update_cell(i,2,new)
+                    break
+            load_area_data.clear()
+            st.rerun()
+
+        if cB.button("Delete"):
+            rows = area_sheet.get_all_values()
+            for i,r in enumerate(rows,1):
+                if len(r)>=2 and r[0]==ma and r[1]==ml:
+                    area_sheet.delete_rows(i)
+                    break
+            load_area_data.clear()
+            st.rerun()
+
+gender = st.selectbox("Gender",["Male","Female","Co-Living"])
+room_type = st.selectbox("Room Type",["AC","Non AC"])
+laundry = st.selectbox("Laundry",["Yes","No"])
+food_type = st.selectbox("Food Type",["Veg","Non Veg","Both"])
 
 st.subheader("⭐ Ratings")
 food = st.slider("Food",0,10,7)
@@ -181,44 +217,34 @@ safety = st.slider("Safety",0,10,8)
 # ---------------- SAVE ----------------
 if st.button("🚀 Final Save"):
 
-    if not pg_name or not owner:
-        st.error("Fill required fields")
-    else:
-        headers = sheet.row_values(1)
-        pg_id = generate_pg_id(sheet)
+    headers = sheet.row_values(1)
+    pg_id = generate_pg_id(sheet)
 
-        for r in st.session_state.saved_rooms:
-            row = {
-                "pg_id":pg_id,
-                "pg_name":pg_name,
-                "location":f"{area}-{locality}",
-                "owner_number":owner,
-                "floor":r["floor"],
-                "room_no":r["room_no"],
-                "sharing_type":f"{r['sharing']} Sharing",
-                "total_beds":r["total_beds"],
-                "available_beds":r["available_beds"],
-                "price":r["price"],
-                "deposit":r["deposit"],
-                "gender":gender,
-                "room_type":room_type,
-                "laundry":laundry,
-                "food_type":food_type,
-                "food_rating":food,
-                "cleanliness":clean,
-                "safety":safety,
-                "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+    for r in st.session_state.saved_rooms:
+        row = {
+            "pg_id":pg_id,
+            "pg_name":pg_name,
+            "location":f"{area}-{locality}",
+            "owner_number":owner,
+            "floor":r["floor"],
+            "room_no":r["room_no"],
+            "sharing_type":f"{r['sharing']} Sharing",
+            "total_beds":r["total_beds"],
+            "available_beds":r["available_beds"],
+            "price":r["price"],
+            "deposit":r["deposit"],
+            "gender":gender,
+            "room_type":room_type,
+            "laundry":laundry,
+            "food_type":food_type,
+            "food_rating":food,
+            "cleanliness":clean,
+            "safety":safety,
+            "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        }
 
-            sheet.append_row([row.get(h.lower(),"") for h in headers])
+        sheet.append_row([row.get(h.lower(),"") for h in headers])
 
-        # 🔔 TOAST + MESSAGE
-        st.toast(f"🎉 Saved! PG ID: {pg_id}", icon="✅")
-        st.success(f"✅ PG Saved Successfully! ID: {pg_id}")
-
-        # CLEAR DATA
-        st.session_state.saved_rooms = []
-        reset_pg_form()
-
-        time.sleep(1)
-        st.rerun()
+    st.success("✅ Saved!")
+    st.session_state.saved_rooms = []
+    st.rerun()
