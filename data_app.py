@@ -160,51 +160,6 @@ owner = st.text_input("Owner Number", key="owner")
 area = st.selectbox("Area", area_list, key="area")
 locality = st.selectbox("Locality", area_locality_map.get(area, []), key="locality")
 
-# ➕ ADD LOCALITY
-with st.expander("➕ Add New Locality"):
-    na = st.text_input("Area", key="na")
-    nl = st.text_input("Locality", key="nl")
-
-    if st.button("Add Locality"):
-        if not na or not nl:
-            st.error("Enter both")
-        elif nl in area_locality_map.get(na, []):
-            st.warning("Exists")
-        else:
-            area_sheet.append_row([na, nl])
-            load_area_data.clear()
-            st.success("Added!")
-            st.rerun()
-
-# ✏️ EDIT DELETE
-with st.expander("✏️ Manage Localities"):
-    ma = st.selectbox("Area", area_list, key="ma")
-    locs = area_locality_map.get(ma, [])
-
-    if locs:
-        ml = st.selectbox("Locality", locs, key="ml")
-        new = st.text_input("Edit", value=ml)
-
-        cA,cB = st.columns(2)
-
-        if cA.button("Update"):
-            rows = area_sheet.get_all_values()
-            for i,r in enumerate(rows,1):
-                if len(r)>=2 and r[0]==ma and r[1]==ml:
-                    area_sheet.update_cell(i,2,new)
-                    break
-            load_area_data.clear()
-            st.rerun()
-
-        if cB.button("Delete"):
-            rows = area_sheet.get_all_values()
-            for i,r in enumerate(rows,1):
-                if len(r)>=2 and r[0]==ma and r[1]==ml:
-                    area_sheet.delete_rows(i)
-                    break
-            load_area_data.clear()
-            st.rerun()
-
 gender = st.selectbox("Gender",["Male","Female","Co-Living"], key="gender")
 room_type = st.selectbox("Room Type",["AC","Non AC"], key="room_type")
 laundry = st.selectbox("Laundry",["Yes","No"], key="laundry")
@@ -215,7 +170,7 @@ food = st.slider("Food",0,10,7,key="food")
 clean = st.slider("Cleanliness",0,10,7,key="clean")
 safety = st.slider("Safety",0,10,8,key="safety")
 
-# ---------------- PREMIUM SAVE ----------------
+# ---------------- FINAL SAVE ----------------
 if st.button("🚀 Final Save"):
 
     if not pg_name or not owner:
@@ -258,13 +213,8 @@ if st.button("🚀 Final Save"):
         st.success(f"✅ PG Saved Successfully! 🆔 {pg_id}")
         st.toast(f"PG {pg_id} saved!", icon="✅")
 
-        st.session_state.saved_rooms = []
-        st.session_state.edit_index = None
+        # 🔥 FORCE CLEAN RESET
+        for key in list(st.session_state.keys()):
+            del st.session_state[key]
 
-        for key in [
-            "pg_name","owner","area","locality",
-            "gender","room_type","laundry","food_type",
-            "food","clean","safety"
-        ]:
-            if key in st.session_state:
-                del st.session_state[key]
+        st.rerun()
