@@ -213,8 +213,20 @@ if st.button("🚀 Final Save"):
         st.success(f"✅ PG Saved Successfully! 🆔 {pg_id}")
         st.toast(f"PG {pg_id} saved!", icon="✅")
 
-        # 🔥 FORCE CLEAN RESET
-        for key in list(st.session_state.keys()):
-            del st.session_state[key]
+        # ✅ SAFE RESET (FIXED)
+        st.session_state.saved_rooms = []
+        st.session_state.edit_index = None
+
+        reset_keys = [
+            "pg_name","owner","area","locality",
+            "gender","room_type","laundry","food_type",
+            "food","clean","safety",
+            "floor","room_no","sharing","total_beds","available_beds",
+            "price","deposit"
+        ]
+
+        for key in reset_keys:
+            if key in st.session_state:
+                del st.session_state[key]
 
         st.rerun()
