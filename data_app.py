@@ -14,7 +14,7 @@ scope = [
     "https://www.googleapis.com/auth/drive"
 ]
 
-# ---------------- CACHE ----------------
+# ---------------- CONNECTION ----------------
 @st.cache_resource
 def get_client():
     creds = ServiceAccountCredentials.from_json_keyfile_dict(
@@ -60,6 +60,7 @@ def load_area_data():
         if len(row) < 2:
             continue
         a, l = row[0].strip(), row[1].strip()
+
         if a and l:
             m.setdefault(a, [])
             if l not in m[a]:
@@ -104,7 +105,7 @@ for i, r in enumerate(st.session_state.saved_rooms):
         st.session_state.saved_rooms.pop(i)
         st.rerun()
 
-# ---------------- FORM ----------------
+# ---------------- ROOM FORM ----------------
 st.markdown("### ✏️ Room Entry")
 
 c1,c2 = st.columns(2)
@@ -153,11 +154,11 @@ st.markdown("---")
 # ---------------- PG DETAILS ----------------
 st.subheader("🏢 PG Details")
 
-pg_name = st.text_input("PG Name")
-owner = st.text_input("Owner Number")
+pg_name = st.text_input("PG Name", key="pg_name")
+owner = st.text_input("Owner Number", key="owner")
 
-area = st.selectbox("Area", area_list)
-locality = st.selectbox("Locality", area_locality_map.get(area, []))
+area = st.selectbox("Area", area_list, key="area")
+locality = st.selectbox("Locality", area_locality_map.get(area, []), key="locality")
 
 # ➕ ADD LOCALITY
 with st.expander("➕ Add New Locality"):
@@ -204,17 +205,17 @@ with st.expander("✏️ Manage Localities"):
             load_area_data.clear()
             st.rerun()
 
-gender = st.selectbox("Gender",["Male","Female","Co-Living"])
-room_type = st.selectbox("Room Type",["AC","Non AC"])
-laundry = st.selectbox("Laundry",["Yes","No"])
-food_type = st.selectbox("Food Type",["Veg","Non Veg","Both"])
+gender = st.selectbox("Gender",["Male","Female","Co-Living"], key="gender")
+room_type = st.selectbox("Room Type",["AC","Non AC"], key="room_type")
+laundry = st.selectbox("Laundry",["Yes","No"], key="laundry")
+food_type = st.selectbox("Food Type",["Veg","Non Veg","Both"], key="food_type")
 
 st.subheader("⭐ Ratings")
-food = st.slider("Food",0,10,7)
-clean = st.slider("Cleanliness",0,10,7)
-safety = st.slider("Safety",0,10,8)
+food = st.slider("Food",0,10,7,key="food")
+clean = st.slider("Cleanliness",0,10,7,key="clean")
+safety = st.slider("Safety",0,10,8,key="safety")
 
-# ---------------- SAVE ----------------
+# ---------------- PREMIUM SAVE ----------------
 if st.button("🚀 Final Save"):
 
     if not pg_name or not owner:
@@ -227,57 +228,43 @@ if st.button("🚀 Final Save"):
         headers = sheet.row_values(1)
         pg_id = generate_pg_id(sheet)
 
-        for r in st.session_state.saved_rooms:
-            row = {
-                "pg_id": pg_id,
-                "pg_name": pg_name,
-                "location": f"{area}-{locality}",
-                "owner_number": owner,
-                "floor": r["floor"],
-                "room_no": r["room_no"],
-                "sharing_type": f"{r['sharing']} Sharing",
-                "total_beds": r["total_beds"],
-                "available_beds": r["available_beds"],
-                "price": r["price"],
-                "deposit": r["deposit"],
-                "gender": gender,
-                "room_type": room_type,
-                "laundry": laundry,
-                "food_type": food_type,
-                "food_rating": food,
-                "cleanliness": clean,
-                "safety": safety,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            }
+        with st.spinner("Saving PG... ⏳"):
+            for r in st.session_state.saved_rooms:
+                row = {
+                    "pg_id":pg_id,
+                    "pg_name":pg_name,
+                    "location":f"{area}-{locality}",
+                    "owner_number":owner,
+                    "floor":r["floor"],
+                    "room_no":r["room_no"],
+                    "sharing_type":f"{r['sharing']} Sharing",
+                    "total_beds":r["total_beds"],
+                    "available_beds":r["available_beds"],
+                    "price":r["price"],
+                    "deposit":r["deposit"],
+                    "gender":gender,
+                    "room_type":room_type,
+                    "laundry":laundry,
+                    "food_type":food_type,
+                    "food_rating":food,
+                    "cleanliness":clean,
+                    "safety":safety,
+                    "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                }
 
-            sheet.append_row([row.get(h.lower(), "") for h in headers])
+                sheet.append_row([row.get(h.lower(),"") for h in headers])
 
-        # ✅ SUCCESS MESSAGE
-        st.success("✅ PG Saved Successfully!")
+        st.balloons()
+        st.success(f"✅ PG Saved Successfully! 🆔 {pg_id}")
+        st.toast(f"PG {pg_id} saved!", icon="✅")
 
-        # ---------------- RESET EVERYTHING ----------------
         st.session_state.saved_rooms = []
         st.session_state.edit_index = None
 
-        # Clear form fields
         for key in [
-            "floor","room_no","sharing","total_beds","available_beds",
-            "price","deposit","area","locality"
+            "pg_name","owner","area","locality",
+            "gender","room_type","laundry","food_type",
+            "food","clean","safety"
         ]:
             if key in st.session_state:
                 del st.session_state[key]
-
-        # Reset PG fields manually
-        st.session_state["pg_name"] = ""
-        st.session_state["owner"] = ""
-        st.session_state["gender"] = "Male"
-        st.session_state["room_type"] = "AC"
-        st.session_state["laundry"] = "Yes"
-        st.session_state["food_type"] = "Veg"
-
-        # Reset ratings
-        st.session_state["food"] = 7
-        st.session_state["clean"] = 7
-        st.session_state["safety"] = 8
-
-        st.rerun()
