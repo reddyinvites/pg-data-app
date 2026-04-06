@@ -165,15 +165,15 @@ room_type = st.selectbox("Room Type",["AC","Non AC"], key="room_type")
 laundry = st.selectbox("Laundry",["Yes","No"], key="laundry")
 food_type = st.selectbox("Food Type",["Veg","Non Veg","Both"], key="food_type")
 
-# ---------------- NEW INTELLIGENCE FIELDS ----------------
-st.subheader("🧠 Smart Ratings")
+# ---------------- NEW RATINGS ----------------
+st.subheader("⭐ Ratings")
 
-cleanliness_score = st.slider("Cleanliness Score", 0, 10, 7)
 food_rating = st.slider("Food Rating", 0, 10, 7)
+cleanliness_score = st.slider("Cleanliness Score", 0, 10, 7)
 maintenance_score = st.slider("Maintenance Score", 0, 10, 7)
+safety = st.slider("Safety", 0, 10, 8)
 
 noise_level = st.selectbox("Noise Level", ["Low", "Medium", "High"])
-crowd_type = st.selectbox("Crowd Type", ["Students", "Employees", "Mixed"])
 
 # ---------------- SAVE ----------------
 if st.button("🚀 Final Save"):
@@ -205,11 +205,11 @@ if st.button("🚀 Final Save"):
                 "room_type":room_type,
                 "laundry":laundry,
                 "food_type":food_type,
-                "cleanliness_score":cleanliness_score,
                 "food_rating":food_rating,
+                "cleanliness_score":cleanliness_score,
                 "maintenance_score":maintenance_score,
                 "noise_level":noise_level,
-                "crowd_type":crowd_type,
+                "safety":safety,
                 "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             }
 
