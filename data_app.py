@@ -217,34 +217,67 @@ safety = st.slider("Safety",0,10,8)
 # ---------------- SAVE ----------------
 if st.button("🚀 Final Save"):
 
-    headers = sheet.row_values(1)
-    pg_id = generate_pg_id(sheet)
+    if not pg_name or not owner:
+        st.error("Fill required fields")
 
-    for r in st.session_state.saved_rooms:
-        row = {
-            "pg_id":pg_id,
-            "pg_name":pg_name,
-            "location":f"{area}-{locality}",
-            "owner_number":owner,
-            "floor":r["floor"],
-            "room_no":r["room_no"],
-            "sharing_type":f"{r['sharing']} Sharing",
-            "total_beds":r["total_beds"],
-            "available_beds":r["available_beds"],
-            "price":r["price"],
-            "deposit":r["deposit"],
-            "gender":gender,
-            "room_type":room_type,
-            "laundry":laundry,
-            "food_type":food_type,
-            "food_rating":food,
-            "cleanliness":clean,
-            "safety":safety,
-            "timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        }
+    elif not st.session_state.saved_rooms:
+        st.error("Add at least one room")
 
-        sheet.append_row([row.get(h.lower(),"") for h in headers])
+    else:
+        headers = sheet.row_values(1)
+        pg_id = generate_pg_id(sheet)
 
-    st.success("✅ Saved!")
-    st.session_state.saved_rooms = []
-    st.rerun()
+        for r in st.session_state.saved_rooms:
+            row = {
+                "pg_id": pg_id,
+                "pg_name": pg_name,
+                "location": f"{area}-{locality}",
+                "owner_number": owner,
+                "floor": r["floor"],
+                "room_no": r["room_no"],
+                "sharing_type": f"{r['sharing']} Sharing",
+                "total_beds": r["total_beds"],
+                "available_beds": r["available_beds"],
+                "price": r["price"],
+                "deposit": r["deposit"],
+                "gender": gender,
+                "room_type": room_type,
+                "laundry": laundry,
+                "food_type": food_type,
+                "food_rating": food,
+                "cleanliness": clean,
+                "safety": safety,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+
+            sheet.append_row([row.get(h.lower(), "") for h in headers])
+
+        # ✅ SUCCESS MESSAGE
+        st.success("✅ PG Saved Successfully!")
+
+        # ---------------- RESET EVERYTHING ----------------
+        st.session_state.saved_rooms = []
+        st.session_state.edit_index = None
+
+        # Clear form fields
+        for key in [
+            "floor","room_no","sharing","total_beds","available_beds",
+            "price","deposit","area","locality"
+        ]:
+            if key in st.session_state:
+                del st.session_state[key]
+
+        # Reset PG fields manually
+        st.session_state["pg_name"] = ""
+        st.session_state["owner"] = ""
+        st.session_state["gender"] = "Male"
+        st.session_state["room_type"] = "AC"
+        st.session_state["laundry"] = "Yes"
+        st.session_state["food_type"] = "Veg"
+
+        # Reset ratings
+        st.session_state["food"] = 7
+        st.session_state["clean"] = 7
+        st.session_state["safety"] = 8
+
+        st.rerun()
